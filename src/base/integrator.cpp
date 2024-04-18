@@ -176,8 +176,7 @@ void DifferentiableIntegrator::Instance::render_backward(Stream &stream, luisa::
     assert(grad_in.size() == pipeline().camera_count());
     for (auto i = 0u; i < pipeline().camera_count(); i++) {
         auto camera = pipeline().camera(i);
-        auto resolution = camera->film()->node()->resolution();
-        auto pixel_count = resolution.x * resolution.y;
+        //auto pixel_count = resolution.x * resolution.y;
         camera->film()->prepare(command_buffer);
         _render_one_camera_backward(command_buffer, 0,  camera, grad_in[i]);
     }

@@ -39,7 +39,7 @@ public:
           _rr_threshold{std::max(desc->property_float_or_default("rr_threshold", 0.95f), 0.05f)},
           _initial_radius{std::max(desc->property_float_or_default("initial_radius", -200.f), -10000.f)},//<0 for world_size/-radius (-grid count)
           _photon_per_iter{std::max(desc->property_uint_or_default("photon_per_iter", 200000u), 10u)},
-          _separate_direct{true},                                                  //when false, use photon mapping for all flux and gathering at first intersection. Just for debug
+          _separate_direct{true}, //when false, use photon mapping for all flux and gathering at first intersection. Just for debug
           _shared_radius{true} {};//whether or not use the shared radius trick in SPPM paper. True is better in performance.
     [[nodiscard]] auto max_depth() const noexcept { return _max_depth; }
     [[nodiscard]] auto photon_per_iter() const noexcept { return _photon_per_iter; }
@@ -211,9 +211,11 @@ public:
     class PixelIndirect {
         Buffer<float> _radius;
         Buffer<uint> _cur_n;
+        Buffer<float> _cur_w;
         Buffer<uint> _n_photon;
         Buffer<float> _phi;
         Buffer<float> _tau;
+        Buffer<float> _weight;
         const Film::Instance *_film;
         const Spectrum::Instance *_spectrum;
         bool _shared_radius;
@@ -232,14 +234,17 @@ public:
             if (shared_radius) {
                 _radius = device.create_buffer<float>(1);
                 _cur_n = device.create_buffer<uint>(1);
+                _cur_w = device.create_buffer<float>(1);
                 _n_photon = device.create_buffer<uint>(1);
             } else {
                 _radius = device.create_buffer<float>(resolution.x * resolution.y);
                 _cur_n = device.create_buffer<uint>(resolution.x * resolution.y);
+                _cur_w = device.create_buffer<float>(resolution.x * resolution.y);
                 _n_photon = device.create_buffer<uint>(resolution.x * resolution.y);
             }
             _phi = device.create_buffer<float>(resolution.x * resolution.y * dimension);
             _tau = device.create_buffer<float>(resolution.x * resolution.y * dimension);
+            _weight = device.create_buffer<float>(resolution.x * resolution.y);
             _photon_per_iter = photon_per_iter;
         }
         void write_radius(Expr<uint> pixel_id, Expr<float> value) noexcept {
@@ -258,6 +263,16 @@ public:
                 _cur_n->write(0u, value);
             }
         }
+        
+        void write_cur_w(Expr<uint> pixel_id, Expr<float> value) noexcept {
+            if (!_shared_radius) {
+                //auto resolution = _film->node()->resolution();
+                _cur_w->write(pixel_id, value);
+            } else {
+                _cur_w->write(0u, value);
+            }
+        }
+
         void write_n_photon(Expr<uint> pixel_id, Expr<uint> value) noexcept {
             if (!_shared_radius) {
                 //auto resolution = _film->node()->resolution();
@@ -266,6 +281,7 @@ public:
                 _n_photon->write(0u, value);
             }
         }
+
         void reset_phi(Expr<uint> pixel_id) noexcept {
             //auto resolution = _film->node()->resolution();
             //auto offset = pixel_id.y * resolution.x + pixel_id.x;
@@ -273,6 +289,7 @@ public:
             for (auto i = 0u; i < dimension; ++i)
                 _phi->write(pixel_id * dimension + i, 0.f);
         }
+
         void reset_tau(Expr<uint> pixel_id) noexcept {
             //auto resolution = _film->node()->resolution();
             //auto offset = pixel_id.y * resolution.x + pixel_id.x;
@@ -280,6 +297,7 @@ public:
             for (auto i = 0u; i < dimension; ++i)
                 _tau->write(pixel_id * dimension + i, 0.f);
         }
+
         auto radius(Expr<uint> pixel_id) const noexcept {
             if (!_shared_radius) {
                 //auto resolution = _film->node()->resolution();
@@ -288,6 +306,7 @@ public:
                 return _radius->read(0u);
             }
         }
+
         //tau=(tau+clamp(phi))*value, see pixel_info_update for useage
         void update_tau(Expr<uint> pixel_id, Expr<float> value) noexcept {
             //auto resolution = _film->node()->resolution();
@@ -301,6 +320,15 @@ public:
                 _tau->write(pixel_id * dimension + i, (old_tau + phi) * value);
             }
         }
+        
+        //weight=(weight+clamp(cur_w))*value, see pixel_info_update for useage
+        void update_weight(Expr<uint> pixel_id, Expr<float> value) noexcept {
+            //auto resolution = _film->node()->resolution();
+            //auto offset = pixel_id.y * resolution.x + pixel_id.x;
+            auto old_weight = _weight->read(pixel_id);
+            auto cur_w = cur_w(pixel_id);
+            _weight->write(pixel_id , (old_weight + cur_w) * value);
+        }
 
         auto n_photon(Expr<uint> pixel_id) const noexcept {
             //auto resolution = _film->node()->resolution();
@@ -310,6 +338,7 @@ public:
                 return _n_photon->read(0u);
             }
         }
+
         auto cur_n(Expr<uint> pixel_id) const noexcept {
             if (!_shared_radius) {
                 //auto resolution = _film->node()->resolution();
@@ -318,6 +347,16 @@ public:
                 return _cur_n->read(0u);
             }
         }
+
+        auto cur_w(Expr<uint> pixel_id) const noexcept {
+            if (!_shared_radius) {
+                //auto resolution = _film->node()->resolution();
+                return _cur_w->read(pixel_id);
+            } else {
+                return _cur_w->read(0u);
+            }
+        }
+
         auto phi(Expr<uint> pixel_id) const noexcept {
             //auto resolution = _film->node()->resolution();
             //auto offset = pixel_id.y * resolution.x + pixel_id.x;
@@ -327,6 +366,7 @@ public:
                 ret[i] = _phi->read(pixel_id * dimension + i);
             return ret;
         }
+        
         auto tau(Expr<uint> pixel_id) const noexcept {
             //auto resolution = _film->node()->resolution();
             //auto offset = pixel_id.y * resolution.x + pixel_id.x;
@@ -336,6 +376,7 @@ public:
                 ret[i] = _tau->read(pixel_id * dimension + i);
             return ret;
         }
+
         void add_cur_n(Expr<uint> pixel_id, Expr<uint> value) noexcept {
             if (!_shared_radius) {
                 //auto resolution = _film->node()->resolution();
@@ -345,6 +386,17 @@ public:
                 _cur_n->atomic(0u).fetch_add(value);
             }
         }
+
+        void add_cur_w(Expr<uint> pixel_id, Expr<float> value) noexcept {
+            if (!_shared_radius) {
+                //auto resolution = _film->node()->resolution();
+                //auto offset = pixel_id.y * resolution.x + pixel_id.x;
+                _cur_w->atomic(pixel_id).fetch_add(value);
+            } else {
+                _cur_w->atomic(0u).fetch_add(value);
+            }
+        }
+
         void add_phi(Expr<uint> pixel_id, Expr<float3> phi) noexcept {
             //auto resolution = _film->node()->resolution();
             //auto offset = pixel_id.y * resolution.x + pixel_id.x;
@@ -352,6 +404,7 @@ public:
             for (auto i = 0u; i < dimension; ++i)
                 _phi->atomic(pixel_id * dimension + i).fetch_add(phi[i]);
         }
+
         void pixel_info_update(Expr<uint> pixel_id) {
             $if(cur_n(pixel_id) > 0) {
                 Float gamma = 2.0f / 3.0f;
@@ -359,6 +412,7 @@ public:
                 Float r_new = radius(pixel_id) * sqrt(n_new * gamma / (n_photon(pixel_id) * gamma + cur_n(pixel_id)));
                 //indirect->write_tau(pixel_id, (indirect->tau(pixel_id) + indirect->phi(pixel_id)) * (r_new * r_new) / (indirect->radius(pixel_id) * indirect->radius(pixel_id)));
                 update_tau(pixel_id, r_new * r_new / (radius(pixel_id) * radius(pixel_id)));
+                update_weight(pixel_id, r_new * r_new / (radius(pixel_id) * radius(pixel_id)));
                 if (!_shared_radius) {
                     write_n_photon(pixel_id, n_new);
                     write_cur_n(pixel_id, 0u);
@@ -543,21 +597,55 @@ protected:
             return;
         };
 
-        Kernel2D emit_photons_bp_kernel = [&](UInt frame_index, Float time, BufferFloat grad_in) noexcept {
-            auto pixel_id = dispatch_id().xy();
-            auto sampler_id = UInt2(pixel_id.x + resolution.x, pixel_id.y);
-            $if(pixel_id.x * resolution.y + pixel_id.y < photon_per_iter) {
-                photon_tracing_bp(camera, frame_index, sampler_id, time, pixel_id.x * resolution.y + pixel_id.y, grad_in);
+        Kernel2D emit_photons_bp_kernel = [&](UInt frame_index, Float time, BufferFloat &grad_in) noexcept {
+            auto fake_pixel_id = dispatch_id().xy();
+            auto sampler_id = UInt2(fake_pixel_id.x + resolution.x, fake_pixel_id.y);
+            auto photon_id = fake_pixel_id.x * resolution.y + fake_pixel_id.y;
+            $if(photon_id < photon_per_iter) {
+                photon_tracing_bp(camera, frame_index, sampler_id, time, photon_id, grad_in);
             };
         };
         
-        Kernel1D accumulate_gradients_kernel = [&]() noexcept {
-            
-        };
 
-        auto view_path_gradient_compute = pipeline().device().compile(view_path_gradient_compute_kernel);
+        //auto view_path_gradient_compute = pipeline().device().compile(view_path_gradient_compute_kernel);
         auto emit_photons_bp = pipeline().device().compile(emit_photons_bp_kernel);
-        auto accumulate_gradients = pipeline().device().compile(accumulate_gradients_kernel);
+
+        // auto shutter_samples = camera->node()->shutter_samples();
+        // command_buffer << synchronize();
+        // LUISA_INFO("Backward Rendering started.");
+        // Clock clock;
+        // ProgressBar progress;
+        // progress.update(0.);
+        // auto dispatch_count = 0u;
+        // auto sample_id = 0u;
+        // bool initial_flag = false;
+        // uint runtime_spp = 0u;
+        
+        // command_buffer << indirect_initialize().dispatch(viewpoints_per_iter) << synchronize();
+        // pipeline().update(command_buffer, 0);
+        
+        command_buffer << emit_photons_bp(0, 0, grad_in).dispatch(make_uint2(add_x, resolution.y));
+
+        // for (auto s : shutter_samples) {
+        //     runtime_spp+=spp;
+        //     for (auto i = 0u; i < s.spp; i++) {
+        //         //command_buffer << viewpoint_reset().dispatch(viewpoints->size());
+        //         //command_buffer << viewpath_construct(sample_id++, s.point.time, s.point.weight).dispatch(resolution);
+        //         //command_buffer << build_grid().dispatch(viewpoints->size());
+        //         command_buffer << indirect_update().dispatch(viewpoints_per_iter);
+        //         if (node<MegakernelPhotonMappingDiff>()->shared_radius()) {
+        //             command_buffer << shared_update().dispatch(1u);
+        //         }
+        //     }
+        // }
+
+        // command_buffer << indirect_draw(node<MegakernelPhotonMappingDiff>()->photon_per_iter(), runtime_spp).dispatch(resolution);
+        // LUISA_INFO("Finishi indirect_draw");
+        command_buffer << synchronize();
+        command_buffer << pipeline().printer().retrieve();
+        progress.done();
+        auto render_time = clock.toc();
+        LUISA_INFO("Rendering finished in {} ms.", render_time);
 
 
 
@@ -617,6 +705,7 @@ protected:
             //camera->pipeline().printer().info("rad:{}", indirect->radius(index));
 
             indirect->write_cur_n(index, 0u);
+            indirect->write_cur_w(index, 0u);
             indirect->write_n_photon(index, 0u);
             indirect->reset_phi(index);
             indirect->reset_tau(index);
@@ -630,7 +719,7 @@ protected:
         Kernel2D viewpath_construct_kernel = [&](UInt frame_index, Float time, Float shutter_weight) noexcept {
             //Construct view path
             auto pixel_id = dispatch_id().xy();
-            auto L = emit_viewpoint(camera, frame_index, pixel_id, time, shutter_weight);
+            auto L = emit_viewpoint_bp(camera, frame_index, pixel_id, time, shutter_weight);
             camera->film()->accumulate(pixel_id, L, 0.5f);
         };
 
@@ -728,8 +817,7 @@ protected:
     [[nodiscard]] Float3 get_indirect(const Spectrum::Instance *spectrum, Expr<uint> pixel_id, Expr<uint> tot_photon) noexcept {
         auto r = indirect->radius(pixel_id);
         auto tau = indirect->tau(pixel_id);
-        Float3 L;
-        L = tau / (tot_photon * pi * r * r);
+        Float3 L = tau / (_weight->read(pixel_id) * pi * r * r);
         return L;
     }
 
@@ -940,8 +1028,9 @@ protected:
                                     } else {
                                         Phi = spectrum->srgb(swl,  beta * viewpoint_beta * eval_viewpoint / abs_cos_theta(wi_local));
                                     }
-                                    indirect->add_phi(pixel_id, Phi);
+                                    indirect->add_phi(pixel_id, Phi*weight);
                                     indirect->add_cur_n(pixel_id, 1u);
+                                    indirect->add_cur_w(pixel_id, weight);
                                     //pipeline().printer().info("working here!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! pixel_id and phi are {}, {} ", pixel_id, Phi);
                                 };
                                 viewpoint_index = viewpoints->nxt(viewpoint_index);
@@ -1007,7 +1096,6 @@ protected:
         auto ray = camera_ray;
         auto pdf_bsdf = def(1e16f);
 
-        
         auto resolution = camera->film()->node()->resolution();
         auto pixel_id_1d = pixel_id.x*resolution.y+pixel_id.y;
         logger->add_start_camera(pixel_id_1d, ray, camera_weight);
@@ -1064,11 +1152,11 @@ protected:
                 $if(q < rr_threshold & u_rr >= q) { stop_direct = true; };
             };
 
-            
             PolymorphicCall<Surface::Closure> call;
             pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
                 surface->closure(call, *it, swl, wo, 1.f, time);
             });
+
             call.execute([&](auto closure) noexcept {
                 if (auto dispersive = closure->is_dispersive()) {
                     $if(*dispersive) { swl.terminate_secondary(); };
@@ -1114,12 +1202,11 @@ protected:
             $if(stop_direct) {
                 auto it_next = pipeline().geometry()->intersect(ray);
                 // logger->add_indirect_end(pixel_id_1d, path_size, beta);
-                // miss
                 $if(!it_next->valid()) {
                     if (pipeline().environment()) {
                         auto eval = light_sampler()->evaluate_miss(ray->direction(), swl, time);
                         Li += beta * eval.L * balance_heuristic(pdf_bsdf, eval.pdf);
-                        //logger->add_envlight_end(pixel_id_1d, path_size, ray->direction(), eval.L);
+                        logger->add_envlight_end(pixel_id_1d, path_size, ray->direction(), eval.L);
                     }
                 };
                 // hit light
@@ -1127,7 +1214,7 @@ protected:
                     $if(it_next->shape().has_light()) {
                         auto eval = light_sampler()->evaluate_hit(*it_next, ray->origin(), swl, time);
                         Li += beta * eval.L * balance_heuristic(pdf_bsdf, eval.pdf);
-                        //logger->add_light_end(pixel_id_1d, path_size, it_next, eval.L);
+                        logger->add_light_end(pixel_id_1d, path_size, it_next, eval.L);
                     };
                 }
                 $break;
@@ -1189,7 +1276,6 @@ protected:
             bary_coords[path_size] = it->bary_coord();
             points[path_size] = it->p();
             normals[path_size] = it->ng();
-            //logger->add_photon_vertex(photon_id_1d, path_size, it);
             path_size+=1;
             
             // generate uniform samples
@@ -1199,8 +1285,8 @@ protected:
             auto rr_depth = node<MegakernelPhotonMappingDiff>()->rr_depth();
             $if(depth + 1u >= rr_depth) { u_rr = sampler()->generate_1d(); };
             $if(depth > 0) {// add diffuse constraint?
+
                 auto grid = viewpoints->point_to_grid(it->p());
-                
                 Float3 grad_beta = make_float3(0.f);
                 Float2 grad_bary = make_float2(0.f);
                 auto count_neighbors = 0u;
@@ -1246,7 +1332,11 @@ protected:
                                         auto wi_local = it->shading().world_to_local(wi);
                                         auto Phi = spectrum->srgb(swl, viewpoint_beta * eval_viewpoint / abs_cos_theta(wi_local));
                                         auto Phi_beta = Phi * beta_diff * weight;
-                                        backward(Phi_beta);
+                                        grad_pixel_0 = grad_in->read(pixel_id*_grad_dimension+0);
+                                        grad_pixel_1 = grad_in->read(pixel_id*_grad_dimension+1);
+                                        grad_pixel_2 = grad_in->read(pixel_id*_grad_dimension+2);
+                                        auto dldPhi = (Phi_beta[0]*grad_pixel_0 + Phi_beta[1]*grad_pixel_1 + Phi_beta[2]*grad_pixel_2) / indirect->cur_w(pixel_id);
+                                        backward(dldPhi);
                                         grad_bary += grad(bary).xy();
                                         grad_beta += grad(beta_diff);
                                     };
@@ -1259,7 +1349,7 @@ protected:
                 };
                 $if(count_neighbors>0){
                     tot_neighbors+=count_neighbors;
-                    grad_betas[path_size] = make_float3(grad_beta[0] / count_neighbors, grad_beta[1] / count_neighbors, grad_beta[2] / count_neighbors);
+                    grad_betas[path_size] = make_float3(grad_beta[0]/count_neighbors, grad_beta[1]/count_neighbors, grad_beta[2]/count_neighbors);
                     grad_barys[path_size] = make_float2(grad_bary[0]/count_neighbors, grad_bary[1]/count_neighbors);
                 };
             };
@@ -1446,7 +1536,7 @@ protected:
             // requires_grad(point_cur_0, point_cur_1, point_cur_2);
             // requires_grad(point_nxt_0, point_nxt_1, point_nxt_2);
                 Float3 point_pre,point_cur,point_nxt,normal_cur;
-                $if(id >= 0) {
+                $if(id > 0) {
                     point_pre = point_pre_0 * bary_pre[0] + point_pre_1 * bary_pre[1] + point_pre_2 * (1 - bary_pre[0] - bary_pre[1]);
                 } $else {
                     point_pre = light_sample.shadow_ray->origin();
