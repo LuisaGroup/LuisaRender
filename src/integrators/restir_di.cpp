@@ -191,20 +191,22 @@ public:
         }
     };
 private:
-    void _generate_sample(ReservoirBuffer &r_buffer, VisibilityBuffer &v_buffer,
-                                   UInt num_initial_sample, const Camera::Instance *camera, Expr<uint> frame_index,
-                                   Expr<uint2> pixel_id, Expr<float> time) const noexcept {
+    luisa::unique_ptr<ReservoirBuffer> _spatial_reservoir_buffer;
+    luisa::unique_ptr<ReservoirBuffer> _temporal_reservoir_buffer;
+    luisa::unique_ptr<VisibilityBuffer> _visibility_buffer;
+    void _generate_sample(Expr<uint> num_initial_sample, const Camera::Instance *camera, Expr<uint> frame_index,
+                          Expr<uint2> pixel_id, Expr<float> time) const noexcept {
         sampler()->start(pixel_id, frame_index);
         auto u_filter = sampler()->generate_pixel_2d();
         auto u_lens = camera->node()->requires_lens_sampling() ? sampler()->generate_2d() : make_float2(.5f);
         auto cs = camera->generate_ray(pixel_id, time, u_filter, u_lens);
-        v_buffer.set_weight(cs.weight, pixel_id);
+        _visibility_buffer->set_weight(cs.weight, pixel_id);
         auto spectrum = pipeline().spectrum();
         auto swl = spectrum->sample(spectrum->node()->is_fixed() ? 0.f : sampler()->generate_1d());
         auto ray = cs.ray;
-        v_buffer.set_ray(ray, pixel_id);
+        _visibility_buffer->set_ray(ray, pixel_id);
         auto hit = pipeline().geometry()->trace_closest(ray);
-        v_buffer.set_hit(hit, pixel_id);
+        _visibility_buffer->set_hit(hit, pixel_id);
         auto reservoir = Reservoir::zero();
         $loop {
             auto wo = -ray->direction();
@@ -230,15 +232,15 @@ private:
             };
             $break;
         };
-        r_buffer.write(reservoir, pixel_id);
+        _spatial_reservoir_buffer->write(reservoir, pixel_id);
     }
-    void _visibility_reuse(ReservoirBuffer &r_buffer, VisibilityBuffer &v_buffer, UInt frame_index, Expr<uint2> pixel_id, Expr<float> time) const noexcept {
+    void _visibility_reuse(Expr<uint> frame_index, Expr<uint2> pixel_id, Expr<float> time) const noexcept {
         sampler()->start(pixel_id, frame_index);
         auto spectrum = pipeline().spectrum();
         auto swl = spectrum->sample(spectrum->node()->is_fixed() ? 0.f : sampler()->generate_1d());
-        auto ray = v_buffer.ray(pixel_id);
-        auto hit = v_buffer.hit(pixel_id);
-        auto reservoir = r_buffer.read(pixel_id);
+        auto ray = _visibility_buffer->ray(pixel_id);
+        auto hit = _visibility_buffer->hit(pixel_id);
+        auto reservoir = _spatial_reservoir_buffer->read(pixel_id);
         $loop {
             auto wo = -ray->direction();
             auto it = pipeline().geometry()->interaction(ray, hit);
@@ -254,48 +256,45 @@ private:
             };
             $break;
         };
-        r_buffer.write(reservoir, pixel_id);
+        _spatial_reservoir_buffer->write(reservoir, pixel_id);
     }
-    void _temporal_reuse(const ReservoirBuffer &history, ReservoirBuffer &r_buffer, VisibilityBuffer &v_buffer,
-                         const Camera::Instance *camera, Expr<uint> frame_index,
+    void _temporal_reuse(const Camera::Instance *camera, Expr<uint> frame_index,
                          Expr<uint2> pixel_id, Expr<float> time) const noexcept {
         sampler()->start(pixel_id, frame_index);
         auto spectrum = pipeline().spectrum();
         auto swl = spectrum->sample(spectrum->node()->is_fixed() ? 0.f : sampler()->generate_1d());
-        auto ray = v_buffer.ray(pixel_id);
-        auto hit = v_buffer.hit(pixel_id);
+        auto ray = _visibility_buffer->ray(pixel_id);
+        auto hit = _visibility_buffer->hit(pixel_id);
         auto constexpr num_neighbor_sample = 5u;
         auto constexpr neighbor_radius = 32.0f;
+        auto reservoir = _spatial_reservoir_buffer->read(pixel_id);
         $loop {
             auto wo = -ray->direction();
             auto it = pipeline().geometry()->interaction(ray, hit);
             // miss
-            $if(!it->valid() | !it->shape().has_surface()) {$break;};
+            $if(!it->valid() | !it->shape().has_surface()) { $break; };
             // temporal reuse
-            $outline {
-                auto reservoir = r_buffer.read(pixel_id);
-                $if(frame_index != 0u) {
-                    auto prev_reservoir = history.read(pixel_id);
-                    $if(dsl::isnan(prev_reservoir.weight.total_weight) | dsl::isnan(prev_reservoir.weight.target_pdf)) {$break;};
-                    prev_reservoir.weight.m = min(prev_reservoir.weight.m, 20.f * reservoir.weight.m);
-                    reservoir.update(prev_reservoir, sampler()->generate_1d());
-                };
-                r_buffer.write(reservoir, pixel_id);
+            $if(frame_index != 0u) {
+                auto prev_reservoir = _temporal_reservoir_buffer->read(pixel_id);
+                $if(dsl::isnan(prev_reservoir.weight.total_weight) | dsl::isnan(prev_reservoir.weight.target_pdf)) { $break; };
+                prev_reservoir.weight.m = min(prev_reservoir.weight.m, 20.f * reservoir.weight.m);
+                reservoir.update(prev_reservoir, sampler()->generate_1d());
             };
             $break;
         };
+        _spatial_reservoir_buffer->write(reservoir, pixel_id);
     }
-    void _spatial_reuse(const ReservoirBuffer &src, ReservoirBuffer &dest, VisibilityBuffer &v_buffer,
-                        UInt pass_index, const Camera::Instance *camera, Expr<uint> frame_index,
+    void _spatial_reuse(Expr<uint> pass_index, const Camera::Instance *camera, Expr<uint> frame_index,
                         Expr<uint2> pixel_id, Expr<float> time) const noexcept {
         auto resolution = camera->film()->node()->resolution();
         sampler()->start(pixel_id << 1u | pass_index, frame_index);
         auto spectrum = pipeline().spectrum();
         auto swl = spectrum->sample(spectrum->node()->is_fixed() ? 0.f : sampler()->generate_1d());
-        auto ray = v_buffer.ray(pixel_id);
-        auto hit = v_buffer.hit(pixel_id);
+        auto ray = _visibility_buffer->ray(pixel_id);
+        auto hit = _visibility_buffer->hit(pixel_id);
         auto constexpr num_neighbor_sample = 5u;
         auto constexpr neighbor_radius = 32.0f;
+        auto reservoir = Reservoir::zero();
         $loop {
             auto wo = -ray->direction();
             auto it = pipeline().geometry()->interaction(ray, hit);
@@ -303,7 +302,11 @@ private:
             $if(!it->valid() | !it->shape().has_surface()) { $break; };
             // spatial reuse
             $outline {
-                auto reservoir = src.read(pixel_id);
+                $if(pass_index % 2u == 0u) {
+                    reservoir = _spatial_reservoir_buffer->read(pixel_id);
+                } $else {
+                    reservoir = _temporal_reservoir_buffer->read(pixel_id);
+                };
                 auto world_to_camera = inverse(camera->camera_to_world());
                 auto current_pixel_depth = (world_to_camera * make_float4(it->p(), 1.f)).z;
                 $for (_, num_neighbor_sample) {
@@ -312,14 +315,19 @@ private:
                     auto theta = 2.f * pi * u_theta;
                     auto offset = make_float2(radius * cos(theta), radius * sin(theta));
                     auto neighbor_id = make_uint2(clamp(make_float2(pixel_id) + offset, make_float2(0.f), make_float2(resolution) - 1.f));
-                    auto neighbor_ray = v_buffer.ray(neighbor_id);
-                    auto neighbor_hit = v_buffer.hit(neighbor_id);
+                    auto neighbor_ray = _visibility_buffer->ray(neighbor_id);
+                    auto neighbor_hit = _visibility_buffer->hit(neighbor_id);
                     auto neighbor_it = pipeline().geometry()->interaction(neighbor_ray, neighbor_hit);
                     $if(neighbor_it->valid() & neighbor_it->shape().has_surface()) {
                         auto neighbor_pixel_depth = (world_to_camera * make_float4(neighbor_it->p(), 1.f)).z;
                         $if(abs(neighbor_pixel_depth - current_pixel_depth) < 0.1f * abs(current_pixel_depth) &
                             dot(it->ng(), neighbor_it->ng()) > 0.9f) {
-                            auto neighbor_reservoir = src.read(neighbor_id);
+                            auto neighbor_reservoir = Reservoir::zero();
+                            $if(pass_index % 2u == 0u) {
+                                neighbor_reservoir = _spatial_reservoir_buffer->read(neighbor_id);
+                            } $else {
+                                neighbor_reservoir = _temporal_reservoir_buffer->read(neighbor_id);
+                            };
                             auto [L, pdf] = _evaluate_without_occlusion(neighbor_reservoir.sample, *it, wo, swl, time);
                             $if(neighbor_reservoir.weight.target_pdf > 0.f) {
                                 auto neighbor_target_pdf = L.sum();
@@ -331,46 +339,14 @@ private:
                         };
                     };
                 };
-                dest.write(reservoir, pixel_id);
             };
             $break;
         };
-    }
-    [[nodiscard]] Float3 Li(const ReservoirBuffer &r_buffer, const VisibilityBuffer &v_buffer, const Camera::Instance *camera, Expr<uint> frame_index, Expr<uint2> pixel_id, Expr<float> time) const noexcept {
-        sampler()->start(pixel_id, frame_index);
-        auto spectrum = pipeline().spectrum();
-        auto swl = spectrum->sample(spectrum->node()->is_fixed() ? 0.f : sampler()->generate_1d());
-        SampledSpectrum Li{swl.dimension(), 0.f};
-        auto ray = v_buffer.ray(pixel_id);
-        auto hit = v_buffer.hit(pixel_id);
-        auto weight = v_buffer.weight(pixel_id);
-        $loop {
-            auto wo = -ray->direction();
-            auto it = pipeline().geometry()->interaction(ray, hit);
-            // miss
-            $if(!it->valid()) {
-                if (pipeline().environment()) {
-                    auto eval = light_sampler()->evaluate_miss(ray->direction(), swl, time);
-                    Li += weight * eval.L;
-                }
-                $break;
-            };
-            // hit light
-            if (!pipeline().lights().empty()) {
-                $if(it->shape().has_light()) {
-                    auto eval = light_sampler()->evaluate_hit(*it, ray->origin(), swl, time);
-                    Li += weight * eval.L;
-                };
-            }
-            // compute direct lighting
-            $if(!it->shape().has_surface()) { $break; };
-            auto reservoir = r_buffer.read(pixel_id);
-            auto [L, _] = _evaluate_with_occlusion(reservoir.sample, *it, wo, swl, time);
-            auto contribution_weight = reservoir.contribution_weight();
-            Li += weight * contribution_weight * L;
-            $break;
+        $if(pass_index % 2u == 0u) {
+            _temporal_reservoir_buffer->write(reservoir, pixel_id);
+        } $else {
+            _spatial_reservoir_buffer->write(reservoir, pixel_id);
         };
-        return spectrum->srgb(swl, Li);
     }
 protected:
     void _render_one_camera(CommandBuffer &command_buffer,
@@ -393,46 +369,52 @@ protected:
             "Rendering to '{}' of resolution {}x{} at {}spp.",
             image_file.string(),
             resolution.x, resolution.y, spp);
-        ReservoirBuffer spatial_reservoir_buffer{pipeline(), resolution};
-        ReservoirBuffer temporal_reservoir_buffer{pipeline(), resolution};
-        VisibilityBuffer v_buffer{pipeline(), resolution};
+        if(!_spatial_reservoir_buffer) {
+            _spatial_reservoir_buffer = luisa::make_unique<ReservoirBuffer>(pipeline(), resolution);
+        }
+        if(!_temporal_reservoir_buffer) {
+            _temporal_reservoir_buffer = luisa::make_unique<ReservoirBuffer>(pipeline(), resolution);
+        }
+        if(!_visibility_buffer) {
+            _visibility_buffer = luisa::make_unique<VisibilityBuffer>(pipeline(), resolution);
+        }
         using namespace luisa::compute;
-        Kernel2D generate_sample_kernel = [&spatial_reservoir_buffer, &v_buffer, camera, this](UInt frame_index, Float time, UInt num_initial_sample) noexcept {
+        Kernel2D generate_sample_kernel = [&](UInt frame_index, Float time, UInt num_initial_sample) noexcept {
             set_block_size(16u, 16u, 1u);
             auto pixel_id = dispatch_id().xy();
-            _generate_sample(spatial_reservoir_buffer, v_buffer, num_initial_sample, camera, frame_index, pixel_id, time);
+            _generate_sample(num_initial_sample, camera, frame_index, pixel_id, time);
         };
         Kernel2D visibility_reuse_kernel = [&](UInt frame_index, Float time) noexcept {
             set_block_size(16u, 16u, 1u);
             auto pixel_id = dispatch_id().xy();
-            _visibility_reuse(spatial_reservoir_buffer, v_buffer, frame_index, pixel_id, time);
+            _visibility_reuse(frame_index, pixel_id, time);
         };
         Kernel2D temporal_reuse_kernel = [&](UInt frame_index, Float time) noexcept {
             set_block_size(16u, 16u, 1u);
             auto pixel_id = dispatch_id().xy();
-            _temporal_reuse(temporal_reservoir_buffer, spatial_reservoir_buffer, v_buffer, camera, frame_index, pixel_id, time);
+            _temporal_reuse(camera, frame_index, pixel_id, time);
         };
         Kernel2D spatial_reuse_kernel = [&](UInt frame_index, Float time, UInt pass_index) noexcept {
             set_block_size(16u, 16u, 1u);
             auto pixel_id = dispatch_id().xy();
             $if(pass_index % 2u == 0u) {
-                _spatial_reuse(spatial_reservoir_buffer, temporal_reservoir_buffer, v_buffer, pass_index, camera, frame_index, pixel_id, time);
+                _spatial_reuse(pass_index, camera, frame_index, pixel_id, time);
             } $else {
-                _spatial_reuse(temporal_reservoir_buffer, spatial_reservoir_buffer, v_buffer, pass_index, camera, frame_index, pixel_id, time);
+                _spatial_reuse(pass_index, camera, frame_index, pixel_id, time);
             };
         };
         Kernel2D swap_kernel = [&]() noexcept {
             set_block_size(16u, 16u, 1u);
             auto pixel_id = dispatch_id().xy();
-            auto r1 = spatial_reservoir_buffer.read(pixel_id);
-            auto r2 = temporal_reservoir_buffer.read(pixel_id);
-            spatial_reservoir_buffer.write(r2, pixel_id);
-            temporal_reservoir_buffer.write(r1, pixel_id);
+            auto r1 = _spatial_reservoir_buffer->read(pixel_id);
+            auto r2 = _temporal_reservoir_buffer->read(pixel_id);
+            _spatial_reservoir_buffer->write(r2, pixel_id);
+            _temporal_reservoir_buffer->write(r1, pixel_id);
         };
         Kernel2D render_kernel = [&](UInt frame_index, Float time, Float shutter_weight) noexcept {
             set_block_size(16u, 16u, 1u);
             auto pixel_id = dispatch_id().xy();
-            auto L = Li(temporal_reservoir_buffer, v_buffer, camera, frame_index, pixel_id, time);
+            auto L = Li(camera, frame_index, pixel_id, time);
             camera->film()->accumulate(pixel_id, shutter_weight * L);
         };
 
@@ -513,6 +495,42 @@ protected:
 
         auto render_time = clock.toc();
         LUISA_INFO("Rendering finished in {} ms.", render_time);
+    }
+    [[nodiscard]] Float3 Li(const Camera::Instance *camera, Expr<uint> frame_index, Expr<uint2> pixel_id, Expr<float> time) const noexcept override {
+        sampler()->start(pixel_id, frame_index);
+        auto spectrum = pipeline().spectrum();
+        auto swl = spectrum->sample(spectrum->node()->is_fixed() ? 0.f : sampler()->generate_1d());
+        SampledSpectrum Li{swl.dimension(), 0.f};
+        auto ray = _visibility_buffer->ray(pixel_id);
+        auto hit = _visibility_buffer->hit(pixel_id);
+        auto weight = _visibility_buffer->weight(pixel_id);
+        $loop {
+            auto wo = -ray->direction();
+            auto it = pipeline().geometry()->interaction(ray, hit);
+            // miss
+            $if(!it->valid()) {
+                if (pipeline().environment()) {
+                    auto eval = light_sampler()->evaluate_miss(ray->direction(), swl, time);
+                    Li += weight * eval.L;
+                }
+                $break;
+            };
+            // hit light
+            if (!pipeline().lights().empty()) {
+                $if(it->shape().has_light()) {
+                    auto eval = light_sampler()->evaluate_hit(*it, ray->origin(), swl, time);
+                    Li += weight * eval.L;
+                };
+            }
+            // compute direct lighting
+            $if(!it->shape().has_surface()) { $break; };
+            auto reservoir = _temporal_reservoir_buffer->read(pixel_id);
+            auto [L, _] = _evaluate_with_occlusion(reservoir.sample, *it, wo, swl, time);
+            auto contribution_weight = reservoir.contribution_weight();
+            Li += weight * contribution_weight * L;
+            $break;
+        };
+        return spectrum->srgb(swl, Li);
     }
 };
 
