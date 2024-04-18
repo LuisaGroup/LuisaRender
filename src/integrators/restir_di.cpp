@@ -260,6 +260,7 @@ private:
     }
     void _temporal_reuse(const Camera::Instance *camera, Expr<uint> frame_index,
                          Expr<uint2> pixel_id, Expr<float> time) const noexcept {
+        auto resolution = camera->film()->node()->resolution();
         sampler()->start(pixel_id, frame_index);
         auto spectrum = pipeline().spectrum();
         auto swl = spectrum->sample(spectrum->node()->is_fixed() ? 0.f : sampler()->generate_1d());
@@ -274,12 +275,18 @@ private:
             // miss
             $if(!it->valid() | !it->shape().has_surface()) { $break; };
             // temporal reuse
-            $if(frame_index != 0u) {
-                auto prev_reservoir = _temporal_reservoir_buffer->read(pixel_id);
-                $if(dsl::isnan(prev_reservoir.weight.total_weight) | dsl::isnan(prev_reservoir.weight.target_pdf)) { $break; };
-                prev_reservoir.weight.m = min(prev_reservoir.weight.m, 20.f * reservoir.weight.m);
-                reservoir.update(prev_reservoir, sampler()->generate_1d());
+            auto prev_frame_reservoir = _temporal_reservoir_buffer->read(pixel_id);
+            $if(dsl::isnan(prev_frame_reservoir.weight.total_weight) | dsl::isnan(prev_frame_reservoir.weight.target_pdf)) { $break; };
+            auto [L, pdf] = _evaluate_without_occlusion(prev_frame_reservoir.sample, *it, wo, swl, time);
+            auto prev_frame_target_pdf = def(0.f), prev_frame_total_weight = def(0.f);
+            $if(prev_frame_reservoir.weight.target_pdf > 0.f & pdf > 0.f) {
+                prev_frame_target_pdf = L.sum();
+                prev_frame_total_weight = prev_frame_reservoir.weight.total_weight * prev_frame_target_pdf / prev_frame_reservoir.weight.target_pdf;
             };
+            prev_frame_reservoir.weight.m = min(prev_frame_reservoir.weight.m, 20.f * reservoir.weight.m);
+            prev_frame_reservoir.weight.total_weight = prev_frame_total_weight;
+            prev_frame_reservoir.weight.target_pdf = prev_frame_target_pdf;
+            reservoir.update(prev_frame_reservoir, sampler()->generate_1d());
             $break;
         };
         _spatial_reservoir_buffer->write(reservoir, pixel_id);
@@ -369,13 +376,13 @@ protected:
             "Rendering to '{}' of resolution {}x{} at {}spp.",
             image_file.string(),
             resolution.x, resolution.y, spp);
-        if(!_spatial_reservoir_buffer) {
+        if (!_spatial_reservoir_buffer) {
             _spatial_reservoir_buffer = luisa::make_unique<ReservoirBuffer>(pipeline(), resolution);
         }
-        if(!_temporal_reservoir_buffer) {
+        if (!_temporal_reservoir_buffer) {
             _temporal_reservoir_buffer = luisa::make_unique<ReservoirBuffer>(pipeline(), resolution);
         }
-        if(!_visibility_buffer) {
+        if (!_visibility_buffer) {
             _visibility_buffer = luisa::make_unique<VisibilityBuffer>(pipeline(), resolution);
         }
         using namespace luisa::compute;
@@ -447,6 +454,7 @@ protected:
             pipeline().update(command_buffer, s.point.time);
             for (auto i = 0u; i < s.spp; i++) {
                 auto constexpr num_spatial_reuse_pass = 2u;
+                camera->film()->clear(command_buffer);
                 command_buffer << generate(sample_id, s.point.time, node<ReSTIRDirectLighting>()->num_initial_sample())
                                       .dispatch(resolution);
                 if (node<ReSTIRDirectLighting>()->enable_visibility_reuse()) {

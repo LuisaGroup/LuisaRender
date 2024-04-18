@@ -68,8 +68,8 @@ public:
     [[nodiscard]] Float2 project(Expr<float3> p) const noexcept override {
         auto data = _device_data->read(0u);
         auto aspect = data.resolution.x / data.resolution.y;
-        auto x = p.x / (aspect * p.z * data.tan_half_fov);
-        auto y = -p.y / (p.z * data.tan_half_fov);
+        auto x = -p.x / (aspect * p.z * data.tan_half_fov);
+        auto y = p.y / (p.z * data.tan_half_fov);
         return .5f * make_float2(x, y) + .5f;
     }
 };
