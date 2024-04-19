@@ -68,7 +68,7 @@ public:
                  w2 = r.weight.total_weight * r.weight.m;
             weight.m = weight.m + r.weight.m;
             weight.total_weight = w1 + w2;
-            $if (u_sel * weight.total_weight < w2) {
+            $if(u_sel * weight.total_weight < w2) {
                 sample = r.sample;
                 weight.target_pdf = r.weight.target_pdf;
             };
@@ -78,15 +78,16 @@ public:
             auto w1 = weight.total_weight * m1, w2 = r.weight.total_weight * m2;
             weight.m = weight.m + r.weight.m;
             weight.total_weight = w1 + w2;
-            $if (u_sel * weight.total_weight < w2) {
+            $if(u_sel * weight.total_weight < w2) {
                 sample = r.sample;
                 weight.target_pdf = r.weight.target_pdf;
             };
         }
     };
+
 private:
     [[nodiscard]] std::pair<SampledSpectrum, Float> _evaluate_without_occlusion(const ReservoirSample &sample, const Interaction &it, Expr<float3> wo,
-                                                                               const SampledWavelengths &swl, Expr<float> time) const noexcept {
+                                                                                const SampledWavelengths &swl, Expr<float> time) const noexcept {
         auto L = SampledSpectrum{swl.dimension(), 0.f};
         auto pdf = def(0.f);
         auto prob = light_sampler()->evaluate_selection(sample.tag, it.p(), swl, time);
@@ -108,7 +109,7 @@ private:
         return std::make_pair(L, pdf);
     }
     [[nodiscard]] std::pair<SampledSpectrum, Float> _evaluate_with_occlusion(const ReservoirSample &sample, const Interaction &it, Expr<float3> wo,
-                                                                                const SampledWavelengths &swl, Expr<float> time) const noexcept {
+                                                                             const SampledWavelengths &swl, Expr<float> time) const noexcept {
         auto L = SampledSpectrum{swl.dimension(), 0.f};
         auto pdf = def(0.f);
         auto prob = light_sampler()->evaluate_selection(sample.tag, it.p(), swl, time);
@@ -130,6 +131,7 @@ private:
         });
         return std::make_pair(L, pdf);
     }
+
 public:
     class VisibilityBuffer {
     private:
@@ -137,6 +139,7 @@ public:
         Buffer<float> _weight;
         Buffer<Ray> _ray;
         Buffer<Hit> _hit;
+
     public:
         VisibilityBuffer(const Pipeline &pipeline, uint2 resolution) noexcept
             : _resolution{resolution} {
@@ -169,6 +172,7 @@ public:
         uint2 _resolution;
         Buffer<uint3> _sample;
         Buffer<float3> _weight;
+
     public:
         ReservoirBuffer(const Pipeline &pipeline, uint2 resolution) noexcept
             : _resolution{resolution} {
@@ -223,10 +227,9 @@ private:
                     auto sel = light_sampler()->select(*it, u_sel, swl, time);
                     auto u_light_selection = sampler()->generate_2d();
                     auto target_pdf = def(0.f), total_weight = def(0.f);
-                    Reservoir candidate {
+                    Reservoir candidate{
                         ReservoirSample{sel.tag, u_light_selection},
-                        ReservoirWeight{1.f, total_weight, target_pdf}
-                    };
+                        ReservoirWeight{1.f, total_weight, target_pdf}};
                     auto [L, pdf] = _evaluate_without_occlusion(candidate.sample, *it, wo, swl, time);
                     candidate.weight.target_pdf = L.sum();
                     candidate.weight.total_weight = ite(pdf == 0.f, 0.f, candidate.weight.target_pdf / pdf);
@@ -320,13 +323,14 @@ private:
             $outline {
                 $if(pass_index % 2u == 0u) {
                     reservoir = _spatial_reservoir_buffer->read(pixel_id);
-                } $else {
+                }
+                $else {
                     reservoir = _temporal_reservoir_buffer->read(pixel_id);
                 };
                 auto camera_to_world = camera->camera_to_world();
                 auto world_to_camera = inverse(camera_to_world);
                 auto current_pixel_depth = (world_to_camera * make_float4(it->p(), 1.f)).z;
-                $for (_, num_neighbor_sample) {
+                $for(_, num_neighbor_sample) {
                     auto u_radius = sampler()->generate_1d(), u_theta = sampler()->generate_1d();
                     auto radius = neighbor_radius * u_radius * u_radius;
                     auto theta = 2.f * pi * u_theta;
@@ -342,7 +346,8 @@ private:
                             auto neighbor_reservoir = Reservoir::zero();
                             $if(pass_index % 2u == 0u) {
                                 neighbor_reservoir = _spatial_reservoir_buffer->read(neighbor_id);
-                            } $else {
+                            }
+                            $else {
                                 neighbor_reservoir = _temporal_reservoir_buffer->read(neighbor_id);
                             };
                             $if(dsl::isnan(neighbor_reservoir.weight.total_weight) | dsl::isnan(neighbor_reservoir.weight.target_pdf)) { $continue; };
@@ -361,10 +366,12 @@ private:
         };
         $if(pass_index % 2u == 0u) {
             _temporal_reservoir_buffer->write(reservoir, pixel_id);
-        } $else {
+        }
+        $else {
             _spatial_reservoir_buffer->write(reservoir, pixel_id);
         };
     }
+
 protected:
     void _render_one_camera(CommandBuffer &command_buffer,
                             Camera::Instance *camera) noexcept override {
@@ -419,7 +426,8 @@ protected:
             auto pixel_id = dispatch_id().xy();
             $if(pass_index % 2u == 0u) {
                 _spatial_reuse(pass_index, camera, frame_index, pixel_id, time);
-            } $else {
+            }
+            $else {
                 _spatial_reuse(pass_index, camera, frame_index, pixel_id, time);
             };
         };
