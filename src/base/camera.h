@@ -76,7 +76,7 @@ public:
         [[nodiscard]] SampleDifferential generate_ray_differential(Expr<uint2> pixel_coord, Expr<float> time,
                                                                    Expr<float2> u_filter, Expr<float2> u_lens) const noexcept;
         [[nodiscard]] Float4x4 camera_to_world() const noexcept;
-        [[nodiscard]] virtual Float2 project(Expr<float3> p) const noexcept = 0;
+        [[nodiscard]] virtual std::pair<Float2, Bool> project(Expr<float3> p_view) const noexcept = 0;
     };
 
     struct ShutterPoint {

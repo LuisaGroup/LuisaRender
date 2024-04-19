@@ -190,10 +190,13 @@ public:
             _weight->write(pixel_id.x + pixel_id.y * _resolution.x, weight);
         }
     };
+
 private:
     luisa::unique_ptr<ReservoirBuffer> _spatial_reservoir_buffer;
     luisa::unique_ptr<ReservoirBuffer> _temporal_reservoir_buffer;
     luisa::unique_ptr<VisibilityBuffer> _visibility_buffer;
+    uint _total_frame_count{0u};
+    Buffer<float4x4> _prev_frame_view_matrix;
     void _generate_sample(Expr<uint> num_initial_sample, const Camera::Instance *camera, Expr<uint> frame_index,
                           Expr<uint2> pixel_id, Expr<float> time) const noexcept {
         sampler()->start(pixel_id, frame_index);
@@ -232,6 +235,9 @@ private:
             };
             $break;
         };
+        $if(dsl::isnan(reservoir.weight.total_weight) | dsl::isnan(reservoir.weight.target_pdf)) {
+            reservoir = Reservoir::zero();
+        };
         _spatial_reservoir_buffer->write(reservoir, pixel_id);
     }
     void _visibility_reuse(Expr<uint> frame_index, Expr<uint2> pixel_id, Expr<float> time) const noexcept {
@@ -266,8 +272,6 @@ private:
         auto swl = spectrum->sample(spectrum->node()->is_fixed() ? 0.f : sampler()->generate_1d());
         auto ray = _visibility_buffer->ray(pixel_id);
         auto hit = _visibility_buffer->hit(pixel_id);
-        auto constexpr num_neighbor_sample = 5u;
-        auto constexpr neighbor_radius = 32.0f;
         auto reservoir = _spatial_reservoir_buffer->read(pixel_id);
         $loop {
             auto wo = -ray->direction();
@@ -275,18 +279,23 @@ private:
             // miss
             $if(!it->valid() | !it->shape().has_surface()) { $break; };
             // temporal reuse
-            auto prev_frame_reservoir = _temporal_reservoir_buffer->read(pixel_id);
-            $if(dsl::isnan(prev_frame_reservoir.weight.total_weight) | dsl::isnan(prev_frame_reservoir.weight.target_pdf)) { $break; };
-            auto [L, pdf] = _evaluate_without_occlusion(prev_frame_reservoir.sample, *it, wo, swl, time);
-            auto prev_frame_target_pdf = def(0.f), prev_frame_total_weight = def(0.f);
-            $if(prev_frame_reservoir.weight.target_pdf > 0.f & pdf > 0.f) {
-                prev_frame_target_pdf = L.sum();
-                prev_frame_total_weight = prev_frame_reservoir.weight.total_weight * prev_frame_target_pdf / prev_frame_reservoir.weight.target_pdf;
+            $if(frame_index == 0u) { $break; };
+            auto prev_frame_view_matrix = _prev_frame_view_matrix->read(0u);
+            auto p_view = make_float3(prev_frame_view_matrix * make_float4(it->p(), 1.f));
+            auto [prev_frame_pixel_id, valid] = camera->project(p_view);
+            prev_frame_pixel_id = clamp(prev_frame_pixel_id, 0.f, make_float2(resolution) - 1.f);
+            $if(valid) {
+                auto prev_frame_reservoir = _temporal_reservoir_buffer->read(make_uint2(prev_frame_pixel_id));
+                $if(dsl::isnan(prev_frame_reservoir.weight.total_weight) | dsl::isnan(prev_frame_reservoir.weight.target_pdf)) { $break; };
+                $if(prev_frame_reservoir.weight.target_pdf > 0.f) {
+                    auto [L, pdf] = _evaluate_without_occlusion(prev_frame_reservoir.sample, *it, wo, swl, time);
+                    auto target_pdf = L.sum();
+                    prev_frame_reservoir.weight.total_weight *= target_pdf / prev_frame_reservoir.weight.target_pdf;
+                    prev_frame_reservoir.weight.target_pdf = target_pdf;
+                    prev_frame_reservoir.weight.m = min(prev_frame_reservoir.weight.m, 20.f * reservoir.weight.m);
+                    reservoir.update(prev_frame_reservoir, sampler()->generate_1d());
+                };
             };
-            prev_frame_reservoir.weight.m = min(prev_frame_reservoir.weight.m, 20.f * reservoir.weight.m);
-            prev_frame_reservoir.weight.total_weight = prev_frame_total_weight;
-            prev_frame_reservoir.weight.target_pdf = prev_frame_target_pdf;
-            reservoir.update(prev_frame_reservoir, sampler()->generate_1d());
             $break;
         };
         _spatial_reservoir_buffer->write(reservoir, pixel_id);
@@ -300,7 +309,7 @@ private:
         auto ray = _visibility_buffer->ray(pixel_id);
         auto hit = _visibility_buffer->hit(pixel_id);
         auto constexpr num_neighbor_sample = 5u;
-        auto constexpr neighbor_radius = 32.0f;
+        auto constexpr neighbor_radius = 30.f;
         auto reservoir = Reservoir::zero();
         $loop {
             auto wo = -ray->direction();
@@ -314,11 +323,12 @@ private:
                 } $else {
                     reservoir = _temporal_reservoir_buffer->read(pixel_id);
                 };
-                auto world_to_camera = inverse(camera->camera_to_world());
+                auto camera_to_world = camera->camera_to_world();
+                auto world_to_camera = inverse(camera_to_world);
                 auto current_pixel_depth = (world_to_camera * make_float4(it->p(), 1.f)).z;
                 $for (_, num_neighbor_sample) {
                     auto u_radius = sampler()->generate_1d(), u_theta = sampler()->generate_1d();
-                    auto radius = neighbor_radius * u_radius;
+                    auto radius = neighbor_radius * u_radius * u_radius;
                     auto theta = 2.f * pi * u_theta;
                     auto offset = make_float2(radius * cos(theta), radius * sin(theta));
                     auto neighbor_id = make_uint2(clamp(make_float2(pixel_id) + offset, make_float2(0.f), make_float2(resolution) - 1.f));
@@ -328,18 +338,18 @@ private:
                     $if(neighbor_it->valid() & neighbor_it->shape().has_surface()) {
                         auto neighbor_pixel_depth = (world_to_camera * make_float4(neighbor_it->p(), 1.f)).z;
                         $if(abs(neighbor_pixel_depth - current_pixel_depth) < 0.1f * abs(current_pixel_depth) &
-                            dot(it->ng(), neighbor_it->ng()) > 0.9f) {
+                            dot(it->ng(), neighbor_it->ng()) > 0.91f) {
                             auto neighbor_reservoir = Reservoir::zero();
                             $if(pass_index % 2u == 0u) {
                                 neighbor_reservoir = _spatial_reservoir_buffer->read(neighbor_id);
                             } $else {
                                 neighbor_reservoir = _temporal_reservoir_buffer->read(neighbor_id);
                             };
+                            $if(dsl::isnan(neighbor_reservoir.weight.total_weight) | dsl::isnan(neighbor_reservoir.weight.target_pdf)) { $continue; };
                             auto [L, pdf] = _evaluate_without_occlusion(neighbor_reservoir.sample, *it, wo, swl, time);
                             $if(neighbor_reservoir.weight.target_pdf > 0.f) {
                                 auto neighbor_target_pdf = L.sum();
-                                auto neighbor_total_weight = neighbor_reservoir.weight.total_weight * neighbor_target_pdf / neighbor_reservoir.weight.target_pdf;
-                                neighbor_reservoir.weight.total_weight = neighbor_total_weight;
+                                neighbor_reservoir.weight.total_weight *= neighbor_target_pdf / neighbor_reservoir.weight.target_pdf;
                                 neighbor_reservoir.weight.target_pdf = neighbor_target_pdf;
                                 reservoir.update(neighbor_reservoir, sampler()->generate_1d());
                             };
@@ -385,6 +395,9 @@ protected:
         if (!_visibility_buffer) {
             _visibility_buffer = luisa::make_unique<VisibilityBuffer>(pipeline(), resolution);
         }
+        if (!_prev_frame_view_matrix.valid()) {
+            _prev_frame_view_matrix = pipeline().device().create_buffer<float4x4>(1u);
+        }
         using namespace luisa::compute;
         Kernel2D generate_sample_kernel = [&](UInt frame_index, Float time, UInt num_initial_sample) noexcept {
             set_block_size(16u, 16u, 1u);
@@ -423,6 +436,10 @@ protected:
             auto pixel_id = dispatch_id().xy();
             auto L = Li(camera, frame_index, pixel_id, time);
             camera->film()->accumulate(pixel_id, shutter_weight * L);
+            $if(all(pixel_id == 0u)) {
+                auto view_matrix = inverse(camera->camera_to_world());
+                _prev_frame_view_matrix->write(0u, view_matrix);
+            };
         };
 
         Clock clock_compile;
@@ -455,22 +472,24 @@ protected:
             for (auto i = 0u; i < s.spp; i++) {
                 auto constexpr num_spatial_reuse_pass = 2u;
                 camera->film()->clear(command_buffer);
-                command_buffer << generate(sample_id, s.point.time, node<ReSTIRDirectLighting>()->num_initial_sample())
+                command_buffer << generate(_total_frame_count, s.point.time, node<ReSTIRDirectLighting>()->num_initial_sample())
                                       .dispatch(resolution);
                 if (node<ReSTIRDirectLighting>()->enable_visibility_reuse()) {
-                    command_buffer << visibility_reuse(sample_id, s.point.time).dispatch(resolution);
+                    command_buffer << visibility_reuse(_total_frame_count, s.point.time).dispatch(resolution);
                 }
                 if (node<ReSTIRDirectLighting>()->enable_temporal_reuse()) {
-                    command_buffer << temporal_reuse(sample_id, s.point.time).dispatch(resolution);
+                    command_buffer << temporal_reuse(_total_frame_count, s.point.time).dispatch(resolution);
                 }
                 if (node<ReSTIRDirectLighting>()->enable_spatial_reuse()) {
                     for (auto j = 0u; j < num_spatial_reuse_pass; j++) {
-                        command_buffer << spatial_reuse(sample_id, s.point.time, j).dispatch(resolution);
+                        command_buffer << spatial_reuse(_total_frame_count, s.point.time, j).dispatch(resolution);
                     }
                 }
                 command_buffer << swap().dispatch(resolution);
-                command_buffer << render(sample_id++, s.point.time, s.point.weight)
+                command_buffer << render(_total_frame_count, s.point.time, s.point.weight)
                                       .dispatch(resolution);
+                sample_id++;
+                _total_frame_count++;
                 if (auto &&p = pipeline().printer(); !p.empty()) {
                     command_buffer << p.retrieve();
                 }

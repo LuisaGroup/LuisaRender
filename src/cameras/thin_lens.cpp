@@ -100,10 +100,11 @@ public:
         return std::make_pair(std::move(ray), 1.f);
     }
 
-    [[nodiscard]] Float2 project(Expr<float3> p) const noexcept override {
+    [[nodiscard]] std::pair<Float2, Bool> project(Expr<float3> p_view) const noexcept override {
         auto data = _device_data->read(0u);
-        auto p_focal = p * (data.focus_distance / p.z);
-        return (make_float2(p_focal.x, -p_focal.y) / data.projected_pixel_size + data.pixel_offset) / data.resolution;
+        auto p = make_float2(-p_view.x / p_view.z, p_view.y / p_view.z) * data.focus_distance;
+        auto pixel = p / data.projected_pixel_size + data.pixel_offset;
+        return std::make_pair(pixel, all(pixel >= 0.f && pixel < data.resolution));
     }
 };
 

@@ -56,12 +56,11 @@ public:
         auto ray = make_ray(make_float3(p.x, -p.y, 0.f), make_float3(0.f, 0.f, -1.f));
         return std::make_pair(std::move(ray), 1.0f);
     }
-    [[nodiscard]] Float2 project(Expr<float3> p) const noexcept override {
+    [[nodiscard]] std::pair<Float2, Bool> project(Expr<float3> p_view) const noexcept override {
         auto data = _device_data->read(0u);
-        auto aspect = data.resolution.x / data.resolution.y;
-        auto x = p.x / (aspect * data.scale);
-        auto y = -p.y / data.scale;
-        return .5f * make_float2(x, y) + .5f;
+        auto p = make_float2(p_view.x, -p_view.y);
+        auto pixel = .5f * (p * data.resolution.y / data.scale + data.resolution);
+        return std::make_pair(pixel, all(pixel >= 0.f && pixel < data.resolution));
     }
 };
 
