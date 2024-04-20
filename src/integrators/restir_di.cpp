@@ -382,6 +382,15 @@ private:
     }
     void _perturb_sample(Expr<uint> frame_index, Expr<uint2> pixel_id, Expr<float> time) const noexcept {
         auto constexpr num_perturb_iter = 10u;
+        auto constexpr sample_gaussian = [](Expr<float2> u) noexcept {
+            Float2 uu = u;
+            uu.x = 2.f * abs(u.x - .5f);
+            auto x = ite(u.x < .5f, -1.f, 1.f) * sqrt(-log(uu));
+            $if(any(dsl::isnan(x))) {
+                x = make_float2(0.f);
+            };
+            return x;
+        };
         sampler()->start(pixel_id, frame_index);
         auto spectrum = pipeline().spectrum();
         auto swl = spectrum->sample(spectrum->node()->is_fixed() ? 0.f : sampler()->generate_1d());
@@ -396,7 +405,8 @@ private:
             // offset the sample location on the light surface
             $for(_, num_perturb_iter) {
                 auto candidate = reservoir;
-                candidate.sample.u_light_surface = clamp(0.02f * sampler()->generate_2d() + reservoir.sample.u_light_surface - 0.01f, 0.f, 1.f);
+                auto perturbation = 0.01f * sample_gaussian(sampler()->generate_2d());
+                candidate.sample.u_light_surface = clamp(reservoir.sample.u_light_surface + perturbation, 0.f, 1.f);
                 auto [L, pdf] = _evaluate_without_occlusion(candidate.sample, *it, wo, swl, time);
                 $if(reservoir.weight.target_pdf > 0.f & pdf > 0.f) {
                     auto target_pdf = L.sum();
@@ -507,6 +517,7 @@ protected:
         luisa::vector<float4> local_pixels;
         if (node()->video()) {
             shutter_samples = camera->node()->uniform_shutter_samples();
+            for(auto &s: shutter_samples) s.spp = 1u;
             local_pixels.resize(pixel_count);
         }
         command_buffer << synchronize();
@@ -526,14 +537,14 @@ protected:
                 camera->film()->clear(command_buffer);
                 command_buffer << generate(_total_frame_count, s.point.time, node<ReSTIRDirectLighting>()->num_initial_sample())
                                       .dispatch(resolution);
-                if (node<ReSTIRDirectLighting>()->enable_temporal_reuse()) {
-                    command_buffer << temporal_reuse(_total_frame_count, s.point.time).dispatch(resolution);
-                }
-                if (node<ReSTIRDirectLighting>()->enable_decorrelation()) {
-                    command_buffer << perturb(_total_frame_count, s.point.time).dispatch(resolution);
-                }
                 if (node<ReSTIRDirectLighting>()->enable_visibility_reuse()) {
                     command_buffer << visibility_reuse(_total_frame_count, s.point.time).dispatch(resolution);
+                }
+                if (node<ReSTIRDirectLighting>()->enable_temporal_reuse()) {
+                    command_buffer << temporal_reuse(_total_frame_count, s.point.time).dispatch(resolution);
+                    if (node<ReSTIRDirectLighting>()->enable_decorrelation()) {
+                        command_buffer << perturb(_total_frame_count, s.point.time).dispatch(resolution);
+                    }
                 }
                 if (node<ReSTIRDirectLighting>()->enable_spatial_reuse()) {
                     for (auto j = 0u; j < num_spatial_reuse_pass; j++) {
