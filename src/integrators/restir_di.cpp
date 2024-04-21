@@ -513,7 +513,7 @@ protected:
         luisa::vector<float4> local_pixels;
         if (node()->video()) {
             shutter_samples = camera->node()->uniform_shutter_samples();
-            for(auto &s: shutter_samples) s.spp = 1u;
+            for (auto &s : shutter_samples) s.spp = 1u;
             local_pixels.resize(pixel_count);
         }
         command_buffer << synchronize();
