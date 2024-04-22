@@ -530,7 +530,6 @@ protected:
             pipeline().update(command_buffer, s.point.time);
             for (auto i = 0u; i < s.spp; i++) {
                 auto constexpr num_spatial_reuse_pass = 2u;
-                camera->film()->clear(command_buffer);
                 command_buffer << generate(_total_frame_count, s.point.time, node<ReSTIRDirectLighting>()->num_initial_sample())
                                       .dispatch(resolution);
                 if (node<ReSTIRDirectLighting>()->enable_visibility_reuse()) {
