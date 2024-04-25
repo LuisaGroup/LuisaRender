@@ -168,12 +168,13 @@ void Differentiation::materialize(CommandBuffer &command_buffer) noexcept {
         command_buffer << image.copy_to(_param_buffer->subview(param_offset, length))
                        << textured_params_range_shader(*_param_range_buffer, p.range(), param_offset).dispatch(length);
     }
+
     //Todo: add buffer parameters(mesh vertex or sth) to _param_buffer
     for (auto &&p : _geometry_params) {
         auto buffer = p.buffer();
         auto param_offset = p.param_offset();
         auto length = buffer.size();
-        command_buffer << _param_buffer->subview(param_offset, length).copy_from(buffer.as<float>());
+        command_buffer << _param_buffer->subview(param_offset, length*8).copy_from(buffer.as<float>());
     }
 
     command_buffer << synchronize();
@@ -451,20 +452,23 @@ void Differentiation::register_optimizer(Optimizer::Instance *optimizer) noexcep
 }
 
 void Differentiation::register_geometry_parameter(const CommandBuffer &command_buffer, Geometry::MeshData& mesh, Accel& accel, uint instance_id) noexcept {
+    
     auto param_offset = _param_buffer_size;
     auto counter_offset = _counter_size;
     auto grad_offset = _gradient_buffer_size;
     auto param_index = static_cast<uint>(_geometry_params.size());
     //auto channels = 3u;
-    uint buffer_id = mesh.geometry_buffer_id_base;
-    auto [buffer_view, bindlessbuffer_id] = _pipeline.bindless_arena_buffer<Vertex>(buffer_id);
-    auto length = buffer_view.size_bytes();
-    //buffer.size();
-    _counter_size = (_counter_size + length + 3u) & ~0b11u;
-    _param_buffer_size = (_param_buffer_size + length + 3u) & ~0b11u;
-    _gradient_buffer_size = (_gradient_buffer_size + length + 3u) & ~0b11u;
-    _geometry_params.emplace_back(param_index, instance_id, grad_offset, param_offset, counter_offset, buffer_view, length, buffer_id);
-    instance2offset.value()->write(instance_id, grad_offset+1u);
+    //uint buffer_id = mesh.geometry_buffer_id_base;
+    auto buffer_view = mesh.vertices;
+    auto length = buffer_view.size() * 8;
+    _counter_size = (_counter_size + length + 8u) & ~0b11u;
+    _param_buffer_size = (_param_buffer_size + length + 8u) & ~0b11u;
+    _gradient_buffer_size = (_gradient_buffer_size + length + 8u) & ~0b11u;
+    _geometry_params.emplace_back(param_index, instance_id, grad_offset, param_offset, counter_offset, buffer_view, length, 0u);
+
+    LUISA_INFO("buffer_view size is {}",buffer_view.size());
+    LUISA_INFO("working here, {}, {}, {}, Mesh with {} triangles.", length, _counter_size, _param_buffer_size, mesh.resource->triangle_count());
+    //instance2offset.value()->write(instance_id, grad_offset+1u);
     //command_buffer << buffer.copy_to(_param_buffer->subview(param_offset, length));
 }
 
@@ -479,13 +483,15 @@ void Differentiation::update_parameter_from_external(Stream &stream, luisa::vect
         stream << image.copy_from(textures[textures_id[i]]);
     }
 
+    LUISA_INFO("working on update paramaters");
     // apply geometry parameters
     for (auto i=0;i<geoms_id.size();i++) {
         auto &&p = _geometry_params[geoms_id[i]];
         auto param_offset = p.param_offset();
-        auto buffer_id = p.buffer_id();
-        auto [buffer_view, bindlessbuffer_id] = _pipeline.bindless_arena_buffer<Vertex>(buffer_id);
+        auto buffer_view = p.buffer();
+        //auto [buffer_view, bindlessbuffer_id] = _pipeline.bindless_arena_buffer<Vertex>(buffer_id);
         auto length = buffer_view.size();
+        LUISA_INFO("here length is {}, size is {}, as<vertex> size is {}",length,geoms[geoms_id[i]].view().size(),geoms[geoms_id[i]].view().as<Vertex>().size());
         stream << buffer_view.copy_from(geoms[geoms_id[i]].view().as<Vertex>());
         _is_dirty = true;
     }

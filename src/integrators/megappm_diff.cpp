@@ -656,11 +656,11 @@ protected:
             };
         };
 
-        Kernel2D emit_photons_kernel = [&](UInt frame_index, Float time) noexcept {
+        Kernel2D emit_photons_kernel = [&](UInt frame_index, Float time, BufferFloat grad_in) noexcept {
             auto pixel_id = dispatch_id().xy();
             auto sampler_id = UInt2(pixel_id.x + resolution.x, pixel_id.y);
             $if(pixel_id.x * resolution.y + pixel_id.y < photon_per_iter) {
-                photon_tracing_bp(camera, frame_index, sampler_id, time, pixel_id.x * resolution.y + pixel_id.y);
+                photon_tracing_bp(camera, frame_index, sampler_id, time, pixel_id.x * resolution.y + pixel_id.y, grad_in);
             };
         };
 
@@ -718,7 +718,7 @@ protected:
                 command_buffer << viewpoint_reset().dispatch(viewpoints->size());
                 command_buffer << viewpath_construct(sample_id++, s.point.time, s.point.weight).dispatch(resolution);
                 command_buffer << build_grid().dispatch(viewpoints->size());
-                command_buffer << emit_photon(sample_id++, s.point.time).dispatch(make_uint2(add_x, resolution.y));
+                command_buffer << emit_photon(sample_id++, s.point.time, grad_in).dispatch(make_uint2(add_x, resolution.y));
                 command_buffer << indirect_update().dispatch(viewpoints_per_iter);
                 if (node<MegakernelPhotonMappingDiff>()->shared_radius()) {
                     command_buffer << shared_update().dispatch(1u);
@@ -887,10 +887,11 @@ protected:
             }
         }
 
+        command_buffer << synchronize();
         command_buffer << indirect_draw(node<MegakernelPhotonMappingDiff>()->photon_per_iter(), runtime_spp).dispatch(resolution);
-        LUISA_INFO("Finishi indirect_draw");
         command_buffer << synchronize();
         command_buffer << pipeline().printer().retrieve();
+        LUISA_INFO("Finishi indirect_draw");
         progress.done();
         auto render_time = clock.toc();
         LUISA_INFO("Rendering finished in {} ms.", render_time);
@@ -1103,7 +1104,7 @@ protected:
                                     auto wi_local = it->shading().world_to_local(wi);
                                     Float3 Phi;
                                     auto rel_dis = dis / indirect->radius(pixel_id);
-                                    auto weight = 3.0f*(1.0f-rel_dis);//- 6 * pow(rel_dis, 5.) + 15 * pow(rel_dis, 4.) - 10 * pow(rel_dis, 3.);
+                                    auto weight = 3.5f*(1.0f- 6 * pow(rel_dis, 5.) + 15 * pow(rel_dis, 4.) - 10 * pow(rel_dis, 3.));
                                     if (!spectrum->node()->is_fixed()) {
                                         auto viewpoint_swl = viewpoints->swl(pixel_id);
                                         Phi = spectrum->wavelength_mul(swl,  beta * (eval_viewpoint / abs_cos_theta(wi_local)), viewpoint_swl, viewpoint_beta);
@@ -1409,11 +1410,11 @@ protected:
                                         requires_grad(bary, beta_diff);
                                         Float3 photon_pos = point_0 * bary[0] + point_1 * bary[1] + point_2 * (1 - bary[0] - bary[1]);
                                         auto rel_dis_diff = distance(position, photon_pos) / rad;
-                                        auto weight = (1-rel_dis_diff)*3;// 1- 6*pow(rel_dis_diff, 5.) + 15*pow(rel_dis_diff, 4.) - 10*pow(rel_dis_diff, 3.);
+                                        auto weight = 3.5f*(1- 6*pow(rel_dis_diff, 5.) + 15*pow(rel_dis_diff, 4.) - 10*pow(rel_dis_diff, 3.));
                                         auto wi_local = it->shading().world_to_local(wi);
                                         auto Phi = spectrum->srgb(swl, viewpoint_beta * eval_viewpoint / abs_cos_theta(wi_local));
                                         auto Phi_beta = Phi * beta_diff * weight;
-                                        auto _grad_dimension = 5u;
+                                        auto _grad_dimension = 3u;
                                         auto grad_pixel_0 = grad_in->read(pixel_id*_grad_dimension+0);
                                         auto grad_pixel_1 = grad_in->read(pixel_id * _grad_dimension + 1);
                                         auto grad_pixel_2 = grad_in->read(pixel_id * _grad_dimension + 2);

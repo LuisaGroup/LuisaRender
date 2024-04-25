@@ -54,7 +54,7 @@ public:
     [[nodiscard]] virtual float shadow_terminator_factor() const noexcept;
     [[nodiscard]] virtual float intersection_offset_factor() const noexcept;
     [[nodiscard]] virtual bool is_mesh() const noexcept;
-    [[nodiscard]] virtual bool requires_grad() const noexcept { return _requires_grad; }
+    [[nodiscard]] virtual bool requires_gradients() const noexcept { return _requires_grad; }
     [[nodiscard]] virtual uint vertex_properties() const noexcept;
     [[nodiscard]] bool has_vertex_normal() const noexcept;
     [[nodiscard]] bool has_vertex_uv() const noexcept;

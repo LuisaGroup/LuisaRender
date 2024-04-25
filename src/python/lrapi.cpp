@@ -250,6 +250,7 @@ PYBIND11_MODULE(_lrapi, m) {
                 geoms.push_back(std::move(buffer));
             }
         }
+        LUISA_INFO("geom_id_size is {}", geoms_id.size());
         scene_python._pipeline->differentiation()->update_parameter_from_external(*scene_python._stream, constants_id, constants, textures_id, textures, geoms_id, geoms);
     });
 

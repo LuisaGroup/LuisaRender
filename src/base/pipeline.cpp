@@ -86,11 +86,18 @@ luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, con
             "No lights or environment found in the scene.");
     }
     update_bindless_if_dirty();
+
+
     pipeline->_integrator = scene.integrator()->build(*pipeline, command_buffer);
+
+    
+    LUISA_INFO_WITH_LOCATION("start _differentiation build.");
     if (auto &&diff = pipeline->_differentiation) {
         diff->register_optimizer(dynamic_cast<DifferentiableIntegrator::Instance *>(pipeline->_integrator.get())->optimizer());
+        LUISA_INFO_WITH_LOCATION("middle _differentiation build.");
         diff->materialize(command_buffer);
     }
+    LUISA_INFO_WITH_LOCATION("finish _differentiation build.");
     if (!pipeline->_transforms.empty()) {
         command_buffer << pipeline->_transform_matrix_buffer.view(0u, pipeline->_transforms.size())
                               .copy_from(pipeline->_transform_matrices.data());

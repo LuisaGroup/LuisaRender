@@ -50,6 +50,7 @@ public:
                                 aiProcess_ValidateDataStructure | aiProcess_ImproveCacheLocality |
                                 aiProcess_PreTransformVertices | aiProcess_FindInvalidData |
                                 aiProcess_JoinIdenticalVertices;
+                            
             auto remove_flags = aiComponent_ANIMATIONS | aiComponent_BONEWEIGHTS |
                                 aiComponent_CAMERAS | aiComponent_LIGHTS |
                                 aiComponent_MATERIALS | aiComponent_TEXTURES |
@@ -101,6 +102,7 @@ public:
                     mesh->mNumUVComponents[0]);
             }
             auto vertex_count = mesh->mNumVertices;
+            LUISA_INFO("vertex_count in loading mesh is {}", vertex_count);
             auto ai_positions = mesh->mVertices;
             auto ai_normals = mesh->mNormals;
             auto ai_uvs = mesh->mTextureCoords[0];

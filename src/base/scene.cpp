@@ -248,15 +248,6 @@ luisa::unique_ptr<Scene> Scene::create(const Context &ctx, const SceneDesc *desc
                 }
             }
         }
-        for (auto &&[_, node] : scene->_config->nodes) {
-            if (node->tag() == SceneNodeTag::TEXTURE) {
-                auto texture = static_cast<Texture *>(node.get());
-                if (texture->requires_gradients()) {
-                    disabled++;
-                    texture->disable_gradients();
-                }
-            }
-        }
         if (disabled != 0u) {
             LUISA_WARNING_WITH_LOCATION(
                 "Disabled gradient computation in {} "

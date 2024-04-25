@@ -1,0 +1,13 @@
+Processing d:\code\luisarender2
+  Installing build dependencies: started
+  Installing build dependencies: finished with status 'done'
+  Getting requirements to build wheel: started
+  Getting requirements to build wheel: finished with status 'done'
+  Preparing metadata (pyproject.toml): started
+  Preparing metadata (pyproject.toml): finished with status 'done'
+Building wheels for collected packages: luisarender-python
+  Building wheel for luisarender-python (pyproject.toml): started
+  Building wheel for luisarender-python (pyproject.toml): finished with status 'done'
+  Created wheel for luisarender-python: filename=luisarender_python-0.0.4-cp310-cp310-win_amd64.whl size=142570754 sha256=0a7fa8cb4f0185fe0a1958fbcd36bb69b5d25304a9a2ae40a83272ade13d91ca
+  Stored in directory: C:\Users\jiankai\AppData\Local\Temp\pip-ephem-wheel-cache-b57azy5n\wheels\f6\99\5f\252c215c0d5676460f053881571f097ce199905284240b4ed3
+Successfully built luisarender-python

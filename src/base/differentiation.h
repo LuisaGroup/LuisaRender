@@ -72,7 +72,7 @@ public:
         GeometryParameter(uint index, uint instance_id, uint grad_offset, uint param_offset,
                           uint counter_offset, BufferView<Vertex> buffer_view, uint length, uint buffer_id) noexcept
             : _index(index), _instance_id{instance_id}, _grad_offset{grad_offset}, _param_offset{param_offset},
-              _counter_offset{counter_offset}, _buffer_view{_buffer_view}, _length(length), _buffer_id(buffer_id) {}
+              _counter_offset{counter_offset}, _buffer_view{buffer_view}, _length(length), _buffer_id(buffer_id) {}
         [[nodiscard]] auto index() const noexcept { return _index; }
         [[nodiscard]] auto buffer() const noexcept { return _buffer_view; }
         [[nodiscard]] auto buffer_id() const noexcept { return _buffer_id; }

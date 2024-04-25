@@ -7,6 +7,7 @@ import numpy as np
 import luisarender
 import matplotlib.pyplot as plt
 import cv2
+import imageio
 luisarender.init()
 def cu_device_ptr_to_torch_tensor(ptr, shape, dtype=cupy.float32):
     """
@@ -59,24 +60,24 @@ def torch_ensure_grad_shape(a, b):
 # def torch_to_luisa_scene(args):
 #     return tuple(torch_to_lc_buffer(a) if is_torch_tensor(a) else a for a in args)    
 
-class RenderWithLuisa(torch.autograd.Function):
-    @staticmethod
-    def forward(ctx, *args):
-        ctx.args = args
-        ctx.scene_luisa = torch_to_luisa_scene(args)
-        #luisa.enable_grad(ctx.args_luisa)
-        res = luisarender.render(*ctx.scene_luisa)
-        ctx.res_luisa = (res,) if not isinstance(res, tuple) else res
-        return lc_buffer_to_torch(res)
+# class RenderWithLuisa(torch.autograd.Function):
+#     @staticmethod
+#     def forward(ctx, *args):
+#         ctx.args = args
+#         ctx.scene_luisa = torch_to_luisa_scene(args)
+#         #luisa.enable_grad(ctx.args_luisa)
+#         res = luisarender.render(*ctx.scene_luisa)
+#         ctx.res_luisa = (res,) if not isinstance(res, tuple) else res
+#         return lc_buffer_to_torch(res)
 
-    @staticmethod
-    @torch.autograd.function.once_differentiable
-    def backward(ctx, *grad_output):
-        luisarender.set_grad(ctx.res_luisa, grad_output)
-        luisarender.render_backward()
-        args_grad = luisarender.get_grad(ctx.scene_luisa)
-        del ctx.scene_luisa, ctx.res_luisa
-        return args_grad
+#     @staticmethod
+#     @torch.autograd.function.once_differentiable
+#     def backward(ctx, *grad_output):
+#         luisarender.set_grad(ctx.res_luisa, grad_output)
+#         luisarender.render_backward()
+#         args_grad = luisarender.get_grad(ctx.scene_luisa)
+#         del ctx.scene_luisa, ctx.res_luisa
+#         return args_grad
 
 
 
@@ -86,40 +87,45 @@ class RenderWithLuisa(torch.autograd.Function):
 #     uint64_t param_buffer_ptr;
 #     float4 param_value;
 
-gt_args = ["C:/Users/jiankai/anaconda3/Lib/site-packages/luisarender/dylibs","-b","cuda", "D:/Code/LuisaRender2/cbox-diff/scenes/cbox-diff/cbox-diff-matte.luisa"]
-init_args = ["C:/Users/jiankai/anaconda3/Lib/site-packages/luisarender/dylibs","-b","cuda", "C:/Users/jiankai/Downloads/bathroom/scene.luisa"]
+
+gt_args = ["C:/Users/jiankai/anaconda3/Lib/site-packages/luisarender/dylibs","-b","cuda", "D:/Code/LuisaRender2/data/scenes/cbox_caustic.luisa"]
+init_args = ["C:/Users/jiankai/anaconda3/Lib/site-packages/luisarender/dylibs","-b","cuda", "D:/Code/LuisaRender2/data/scenes/cbox_caustic.luisa"]
+
 differentiable_params_list = [
-    #{"type":"mesh","idx":0,"param":"vertex_position"},
-    {"type":"texture","idx":0,"param":"base_color"}
+    {"type":"mesh","idx":0,"param":"vertex_position"},
+    #{"type":"texture","idx":0,"param":"base_color"}
 ]
-scene_torch = [#torch.tensor([[-1.01, 0.00,  0.99]]),
-               torch.tensor([[0.9, 0.9, 0.9]])
-               ]
 
 luisarender.load_scene(gt_args)
-target_img = cu_device_ptr_to_torch_tensor(luisarender.render()[0], (1024, 1024,4)).clone()
+#target_img = cu_device_ptr_to_torch_tensor(luisarender.render()[0], (512, 512, 4)).clone()
+#imageio.imwrite("gt.exr",target_img.detach().cpu().numpy()[...,:3])
+#imgplot = plt.imshow(np.hstack([target_img.detach().cpu().numpy()[...,:3]]))
+#plt.show()]
+#imageio.imwrite('float_img.exr', arr)
 
-tex = torch.zeros((853,656,4),device='cuda',requires_grad=True)
-tex_ptr = tex.contiguous().data_ptr()
-tex_size = np.prod(tex.shape)
-tex_dtype=float
-optimizer = torch.optim.Adam([tex], lr=0.05)
+vertex_pos = torch.zeros((61674,8),device='cuda')
+vertex_pos[...,1]=1.5
+pos_ptr = vertex_pos.contiguous().data_ptr()
+pos_size = np.prod(vertex_pos.shape)
+pos_dtype=float
+optimizer = torch.optim.Adam([vertex_pos], lr=0.001)
 
 x = luisarender.ParamStruct()
-x.type = 'texture'
+x.type = 'geom'
 x.id = 0
-x.size = tex_size
-x.buffer_ptr = tex_ptr
+x.size = pos_size
+x.buffer_ptr = pos_ptr
 
-y = luisarender.ParamStruct()
-y.type = 'geometry'
-y.id = 0
+
 #x.size = sphere_size
 #x.buffer_ptr = tex_ptr
 
 for i in range(500):
-    luisarender.update_scene([x, y])
-    render_img = cu_device_ptr_to_torch_tensor(luisarender.render()[0], (1024, 1024,4))
+    luisarender.update_scene([x])
+    render_img = cu_device_ptr_to_torch_tensor(luisarender.render()[0], (512, 512,4)).clone()
+    imageio.imwrite("init.exr",render_img.detach().cpu().numpy()[...,:3])
+    print("sdlfjsdfkl")
+    exit()
     cv2.imshow("render", cv2.cvtColor(render_img.detach().cpu().numpy()[...,:3], cv2.COLOR_BGR2RGB))
     cv2.waitKey(0)
     render_img.requires_grad_()

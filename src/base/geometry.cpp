@@ -21,9 +21,12 @@ void Geometry::build(CommandBuffer &command_buffer,
     _triangle_count = 0u;
     for (auto shape : shapes) { _process_shape(command_buffer, shape, init_time, nullptr); }
     LUISA_INFO_WITH_LOCATION("Geometry built with {} triangles.", _triangle_count);
+
     _instance_buffer = _pipeline.device().create_buffer<uint4>(_instances.size());
     command_buffer << _instance_buffer.copy_from(_instances.data())
                    << _accel.build();
+    command_buffer << synchronize();
+    LUISA_INFO_WITH_LOCATION("Finish accel_build");
 }
 
 void Geometry::_process_shape(
@@ -85,7 +88,7 @@ void Geometry::_process_shape(
                 command_buffer << alias_table_buffer_view.copy_from(alias_table.data())
                                << pdf_buffer_view.copy_from(pdf.data());
                 command_buffer << compute::commit();
-                auto geom = MeshGeometry{mesh, vertex_buffer_id};
+                auto geom = MeshGeometry{mesh, vertex_buffer_id, vertex_buffer->view()};
                 _mesh_cache.emplace(hash, geom);
                 return geom;
             }();
@@ -96,6 +99,7 @@ void Geometry::_process_shape(
             // assign mesh data
             MeshData mesh_data{
                 .resource = mesh_geom.resource,
+                .vertices = mesh_geom.vertices,
                 .shadow_term = encode_fixed_point(shape->has_vertex_normal() ? shape->shadow_terminator_factor() : 0.f),
                 .intersection_offset = encode_fixed_point(shape->intersection_offset_factor()),
                 .geometry_buffer_id_base = mesh_geom.buffer_id_base,
@@ -103,15 +107,16 @@ void Geometry::_process_shape(
             _meshes.emplace(shape, mesh_data);
             return mesh_data;
         }();
+        //_pipeline.buffer<Vertex>(v_buffer)
         auto instance_id = static_cast<uint>(_accel.size());
         auto [t_node, is_static] = _transform_tree.leaf(shape->transform());
         InstancedTransform inst_xform{t_node, instance_id};
         if (!is_static) { _dynamic_transforms.emplace_back(inst_xform); }
         auto object_to_world = inst_xform.matrix(init_time);
         _accel.emplace_back(*mesh.resource, object_to_world, visible);
-
-
-        if (shape->requires_grad()) {
+        //LUISA_INFO("sdlfjdslkfjsdklf {}", instance_id);
+        if (shape->requires_gradients()) {
+            LUISA_INFO("requires_gradients {}", instance_id);
             _pipeline.differentiation()->register_geometry_parameter(command_buffer, mesh, _accel, instance_id);
         }
 
@@ -190,7 +195,9 @@ bool Geometry::update(CommandBuffer &command_buffer, float time) noexcept {
             }
             _pipeline.differentiation()->clear_dirty();
         }
-        command_buffer << _accel.build();
+        LUISA_INFO("start build accel");
+        command_buffer << _accel.build() << synchronize();
+        LUISA_INFO("end build accel");
     }
     return updated;
 }

@@ -36,6 +36,7 @@ using compute::Expr;
 using compute::Float4x4;
 using compute::Mesh;
 using compute::Var;
+using compute::BufferView;
 
 class Pipeline;
 
@@ -45,17 +46,19 @@ public:
     struct MeshGeometry {
         Mesh *resource;
         uint buffer_id_base;
+        BufferView<Vertex> vertices;
     };
 
     struct MeshData {
         Mesh *resource;
+        BufferView<Vertex> vertices;
         uint16_t shadow_term;
         uint16_t intersection_offset;
         uint geometry_buffer_id_base : 22;
         uint vertex_properties : 10;
     };
 
-    static_assert(sizeof(MeshData) == 16u);
+    //static_assert(sizeof(MeshData) == 16u);
 
 private:
     Pipeline &_pipeline;
