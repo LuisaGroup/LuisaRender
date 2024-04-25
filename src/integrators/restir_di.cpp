@@ -24,6 +24,7 @@ private:
     bool _enable_temporal_reuse;
     bool _enable_decorrelation;
     bool _enable_spatial_reuse;
+    bool _unbiased_spatial_reuse;
 
 public:
     ReSTIRDirectLighting(Scene *scene, const SceneNodeDesc *desc) noexcept
@@ -32,12 +33,14 @@ public:
           _enable_visibility_reuse{desc->property_bool_or_default("enable_visibility_reuse", true)},
           _enable_temporal_reuse{desc->property_bool_or_default("enable_temporal_reuse", true)},
           _enable_decorrelation{desc->property_bool_or_default("enable_decorrelation", true)},
-          _enable_spatial_reuse{desc->property_bool_or_default("enable_spatial_reuse", true)} {}
+          _enable_spatial_reuse{desc->property_bool_or_default("enable_spatial_reuse", true)},
+          _unbiased_spatial_reuse{desc->property_bool_or_default("unbiased_spatial_reuse", false)} {}
     [[nodiscard]] auto num_initial_sample() const noexcept { return _num_initial_sample; }
     [[nodiscard]] auto enable_visibility_reuse() const noexcept { return _enable_visibility_reuse; }
     [[nodiscard]] auto enable_temporal_reuse() const noexcept { return _enable_temporal_reuse; }
     [[nodiscard]] auto enable_decorrelation() const noexcept { return _enable_decorrelation; }
     [[nodiscard]] auto enable_spatial_reuse() const noexcept { return _enable_spatial_reuse; }
+    [[nodiscard]] auto unbiased_spatial_reuse() const noexcept { return _unbiased_spatial_reuse; }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] luisa::unique_ptr<Integrator::Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
@@ -380,6 +383,99 @@ private:
             _spatial_reservoir_buffer->write(reservoir, pixel_id);
         };
     }
+    void _unbiased_spatial_reuse(Expr<uint> pass_index, const Camera::Instance *camera, Expr<uint> frame_index,
+                                 Expr<uint2> pixel_id, Expr<float> time) const noexcept {
+        auto resolution = camera->film()->node()->resolution();
+        sampler()->start(pixel_id << 1u | pass_index, frame_index);
+        auto spectrum = pipeline().spectrum();
+        auto swl = spectrum->sample(spectrum->node()->is_fixed() ? 0.f : sampler()->generate_1d());
+        auto ray = _visibility_buffer->ray(pixel_id);
+        auto hit = _visibility_buffer->hit(pixel_id);
+        auto constexpr num_neighbor_sample = 3u;
+        auto constexpr neighbor_radius = 30.f;
+        auto reservoir = Reservoir::zero();
+        auto valid_neighbor_array = ArrayUInt2<num_neighbor_sample>();
+        auto num_valid_neighbor = def(0u);
+        auto z = def(0.f);
+        $loop {
+            auto wo = -ray->direction();
+            auto it = pipeline().geometry()->interaction(ray, hit);
+            // miss
+            $if(!it->valid() | !it->shape().has_surface()) { $break; };
+            // spatial reuse
+            $outline {
+                $if(pass_index % 2u == 0u) {
+                    reservoir = _spatial_reservoir_buffer->read(pixel_id);
+                }
+                $else {
+                    reservoir = _temporal_reservoir_buffer->read(pixel_id);
+                };
+                z += reservoir.weight.m;
+                auto camera_to_world = camera->camera_to_world();
+                auto world_to_camera = inverse(camera_to_world);
+                auto current_pixel_depth = (world_to_camera * make_float4(it->p(), 1.f)).z;
+                $for(_, num_neighbor_sample) {
+                    auto u_radius = sampler()->generate_1d(), u_theta = sampler()->generate_1d();
+                    auto radius = neighbor_radius * sqrt(u_radius);
+                    auto theta = 2.f * pi * u_theta;
+                    auto offset = make_float2(radius * cos(theta), radius * sin(theta));
+                    auto neighbor_id = make_uint2(clamp(make_float2(pixel_id) + offset, make_float2(0.f), make_float2(resolution) - 1.f));
+                    auto neighbor_ray = _visibility_buffer->ray(neighbor_id);
+                    auto neighbor_hit = _visibility_buffer->hit(neighbor_id);
+                    auto neighbor_it = pipeline().geometry()->interaction(neighbor_ray, neighbor_hit);
+                    $if(neighbor_it->valid() & neighbor_it->shape().has_surface()) {
+                        auto neighbor_pixel_depth = (world_to_camera * make_float4(neighbor_it->p(), 1.f)).z;
+                        $if(abs(neighbor_pixel_depth - current_pixel_depth) < 0.1f * abs(current_pixel_depth) &
+                            dot(it->ng(), neighbor_it->ng()) > 0.91f) {
+                            auto neighbor_reservoir = Reservoir::zero();
+                            $if(pass_index % 2u == 0u) {
+                                neighbor_reservoir = _spatial_reservoir_buffer->read(neighbor_id);
+                            }
+                            $else {
+                                neighbor_reservoir = _temporal_reservoir_buffer->read(neighbor_id);
+                            };
+                            $if(dsl::isnan(neighbor_reservoir.weight.total_weight) | dsl::isnan(neighbor_reservoir.weight.target_pdf)) { $continue; };
+                            auto [L, pdf] = _evaluate_without_occlusion(neighbor_reservoir.sample, *it, wo, swl, time);
+                            $if(neighbor_reservoir.weight.target_pdf > 0.f) {
+                                auto neighbor_target_pdf = L.sum();
+                                neighbor_reservoir.weight.total_weight *= neighbor_target_pdf / neighbor_reservoir.weight.target_pdf;
+                                neighbor_reservoir.weight.target_pdf = neighbor_target_pdf;
+                                reservoir.update(neighbor_reservoir, sampler()->generate_1d());
+                                valid_neighbor_array[num_valid_neighbor] = neighbor_id;
+                                num_valid_neighbor += 1u;
+                            };
+                        };
+                    };
+                };
+                $for(neighbor_index, num_valid_neighbor) {
+                    auto neighbor_id = valid_neighbor_array[neighbor_index];
+                    auto neighbor_ray = _visibility_buffer->ray(neighbor_id);
+                    auto neighbor_hit = _visibility_buffer->hit(neighbor_id);
+                    auto neighbor_it = pipeline().geometry()->interaction(neighbor_ray, neighbor_hit);
+                    auto [L, _] = _evaluate_without_occlusion(reservoir.sample, *neighbor_it, -neighbor_ray->direction(), swl, time);
+                    auto target_pdf = L.sum();
+                    $if(target_pdf > 0.f) {
+                        auto neighbor_reservoir = Reservoir::zero();
+                        $if(pass_index % 2u == 0u) {
+                            neighbor_reservoir = _spatial_reservoir_buffer->read(neighbor_id);
+                        } $else {
+                            neighbor_reservoir = _temporal_reservoir_buffer->read(neighbor_id);
+                        };
+                        z += neighbor_reservoir.weight.m;
+                    };
+                };
+                reservoir.weight.total_weight *= reservoir.weight.m / z;
+                reservoir.weight.m = z;
+            };
+            $break;
+        };
+        $if(pass_index % 2u == 0u) {
+            _temporal_reservoir_buffer->write(reservoir, pixel_id);
+        }
+        $else {
+            _spatial_reservoir_buffer->write(reservoir, pixel_id);
+        };
+    }
     void _perturb_sample(Expr<uint> frame_index, Expr<uint2> pixel_id, Expr<float> time) const noexcept {
         auto constexpr num_perturb_iter = 10u;
         auto constexpr sample_box_muller = [](Expr<float2> u) noexcept {
@@ -480,6 +576,16 @@ protected:
                 _spatial_reuse(pass_index, camera, frame_index, pixel_id, time);
             };
         };
+        Kernel2D unbiased_spatial_reuse_kernel = [&](UInt frame_index, Float time, UInt pass_index) noexcept {
+            set_block_size(16u, 16u, 1u);
+            auto pixel_id = dispatch_id().xy();
+            $if(pass_index % 2u == 0u) {
+                _unbiased_spatial_reuse(pass_index, camera, frame_index, pixel_id, time);
+            }
+            $else {
+                _unbiased_spatial_reuse(pass_index, camera, frame_index, pixel_id, time);
+            };
+        };
         Kernel2D swap_kernel = [&]() noexcept {
             set_block_size(16u, 16u, 1u);
             auto pixel_id = dispatch_id().xy();
@@ -505,6 +611,7 @@ protected:
         auto temporal_reuse = pipeline().device().compile(temporal_reuse_kernel);
         auto perturb = pipeline().device().compile(perturb_sample_kernel);
         auto spatial_reuse = pipeline().device().compile(spatial_reuse_kernel);
+        auto unbiased_spatial_reuse = pipeline().device().compile(unbiased_spatial_reuse_kernel);
         auto swap = pipeline().device().compile(swap_kernel);
         auto render = pipeline().device().compile(render_kernel);
         auto integrator_shader_compilation_time = clock_compile.toc();
@@ -546,7 +653,11 @@ protected:
                 }
                 if (node<ReSTIRDirectLighting>()->enable_spatial_reuse()) {
                     for (auto j = 0u; j < num_spatial_reuse_pass; j++) {
-                        command_buffer << spatial_reuse(_total_frame_count, s.point.time, j).dispatch(resolution);
+                        if (node<ReSTIRDirectLighting>()->unbiased_spatial_reuse()) {
+                            command_buffer << unbiased_spatial_reuse(_total_frame_count, s.point.time, j).dispatch(resolution);
+                        } else {
+                            command_buffer << spatial_reuse(_total_frame_count, s.point.time, j).dispatch(resolution);
+                        }
                     }
                 }
                 command_buffer << swap().dispatch(resolution);
