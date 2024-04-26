@@ -464,7 +464,7 @@ void Differentiation::register_geometry_parameter(const CommandBuffer &command_b
     _counter_size = (_counter_size + length + 8u) & ~0b11u;
     _param_buffer_size = (_param_buffer_size + length + 8u) & ~0b11u;
     _gradient_buffer_size = (_gradient_buffer_size + length + 8u) & ~0b11u;
-    _geometry_params.emplace_back(param_index, instance_id, grad_offset, param_offset, counter_offset, buffer_view, length, 0u);
+    _geometry_params.emplace_back(param_index, instance_id, grad_offset, param_offset, counter_offset, buffer_view, length, 0u, mesh.resource);
 
     LUISA_INFO("buffer_view size is {}",buffer_view.size());
     LUISA_INFO("working here, {}, {}, {}, Mesh with {} triangles.", length, _counter_size, _param_buffer_size, mesh.resource->triangle_count());
@@ -483,7 +483,7 @@ void Differentiation::update_parameter_from_external(Stream &stream, luisa::vect
         stream << image.copy_from(textures[textures_id[i]]);
     }
 
-    LUISA_INFO("working on update paramaters");
+    LUISA_INFO("working on update paramaters {}",geoms_id.size());
     // apply geometry parameters
     for (auto i=0;i<geoms_id.size();i++) {
         auto &&p = _geometry_params[geoms_id[i]];
@@ -492,10 +492,13 @@ void Differentiation::update_parameter_from_external(Stream &stream, luisa::vect
         //auto [buffer_view, bindlessbuffer_id] = _pipeline.bindless_arena_buffer<Vertex>(buffer_id);
         auto length = buffer_view.size();
         LUISA_INFO("here length is {}, size is {}, as<vertex> size is {}",length,geoms[geoms_id[i]].view().size(),geoms[geoms_id[i]].view().as<Vertex>().size());
-        stream << buffer_view.copy_from(geoms[geoms_id[i]].view().as<Vertex>());
+        stream << buffer_view.copy_from(geoms[geoms_id[i]].view().as<Vertex>()) << synchronize() << p.mesh()->build() << synchronize();
         _is_dirty = true;
     }
-    stream << synchronize();
+    
+    //CommandBuffer command_buffer{&stream};
+    //pipeline().geometry()->build(command_buffer, _shapes, pipeline()._initial_time);
+    //stream << synchronize();
 }
  
 std::tuple<luisa::vector<void *>, luisa::vector<void *>> Differentiation::get_gradients(Stream &stream) {

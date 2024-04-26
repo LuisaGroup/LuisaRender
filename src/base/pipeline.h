@@ -97,10 +97,10 @@ private:
     luisa::unordered_map<luisa::string, uint> _named_ids;
     // other things
     luisa::unique_ptr<Printer> _printer;
-    float _initial_time{};
     bool _any_dynamic_transforms{false};
 
 public:
+    float _initial_time{};
     // for internal use only; use Pipeline::create() instead
     explicit Pipeline(Device &device) noexcept;
     Pipeline(Pipeline &&) noexcept = delete;

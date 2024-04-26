@@ -48,6 +48,9 @@ void Geometry::_process_shape(
         }
         auto mesh = [&] {
             if (auto iter = _meshes.find(shape); iter != _meshes.end()) {
+                command_buffer << compute::commit()
+                               << iter->second.resource->build()
+                               << compute::commit();
                 return iter->second;
             }
             auto mesh_geom = [&] {
@@ -190,14 +193,14 @@ bool Geometry::update(CommandBuffer &command_buffer, float time) noexcept {
     if(_pipeline.differentiable())
     {
         if (_pipeline.differentiation()->is_dirty()) {
-            for (auto t : _pipeline.differentiation()->geometry_parameters()) {
-                _accel.set_prim_handle(t.instance_id(), (uint64_t)t.buffer().native_handle());
-            }
-            _pipeline.differentiation()->clear_dirty();
+            //for (auto t : _pipeline.differentiation()->geometry_parameters()) {
+            //    _accel.set_prim_handle(t.instance_id(), (uint64_t)t.buffer().native_handle());
+            //}
+            //_pipeline.differentiation()->clear_dirty();
+            LUISA_INFO("start build accel");
+            command_buffer << _accel.build() << synchronize();
+            LUISA_INFO("end build accel");
         }
-        LUISA_INFO("start build accel");
-        command_buffer << _accel.build() << synchronize();
-        LUISA_INFO("end build accel");
     }
     return updated;
 }

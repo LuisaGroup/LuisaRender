@@ -96,6 +96,7 @@ luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, con
         diff->register_optimizer(dynamic_cast<DifferentiableIntegrator::Instance *>(pipeline->_integrator.get())->optimizer());
         LUISA_INFO_WITH_LOCATION("middle _differentiation build.");
         diff->materialize(command_buffer);
+        diff->_shapes = scene.shapes();
     }
     LUISA_INFO_WITH_LOCATION("finish _differentiation build.");
     if (!pipeline->_transforms.empty()) {
