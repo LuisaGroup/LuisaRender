@@ -176,9 +176,7 @@ void Differentiation::materialize(CommandBuffer &command_buffer) noexcept {
         auto length = buffer.size();
         command_buffer << _param_buffer->subview(param_offset, length*8).copy_from(buffer.as<float>());
     }
-
     command_buffer << synchronize();
-
     _optimizer->initialize(command_buffer, _param_buffer_size, *_param_buffer, *_param_grad_buffer, *_param_range_buffer);
 }
 
@@ -382,6 +380,7 @@ void Differentiation::add_geom_gradients(Float3 grad_v, Float3 grad_n, Float3 we
 
     auto instance = pipeline().geometry()->instance(inst_id);
     auto triangle = pipeline().geometry()->triangle(instance, triangle_id);
+
     _grad_buffer.value()->atomic(gradient_offset + triangle.i0 * 8 + 0).fetch_add(grad_v[0] * weight[0]);
     _grad_buffer.value()->atomic(gradient_offset + triangle.i0 * 8 + 1).fetch_add(grad_v[1] * weight[0]);
     _grad_buffer.value()->atomic(gradient_offset + triangle.i0 * 8 + 2).fetch_add(grad_v[2] * weight[0]);
@@ -495,10 +494,21 @@ void Differentiation::update_parameter_from_external(Stream &stream, luisa::vect
         stream << buffer_view.copy_from(geoms[geoms_id[i]].view().as<Vertex>()) << synchronize() << p.mesh()->build() << synchronize();
         _is_dirty = true;
     }
-    
-    //CommandBuffer command_buffer{&stream};
-    //pipeline().geometry()->build(command_buffer, _shapes, pipeline()._initial_time);
-    //stream << synchronize();
+}
+
+std::tuple<luisa::vector<void *>, luisa::vector<uint>> Differentiation::get_parameter_from_external(Stream &stream, luisa::vector<uint> &constants_id, luisa::vector<uint> &textures_id, luisa::vector<uint> &geoms_id) noexcept {
+    luisa::vector<void*> geom_param{};
+    luisa::vector<uint> geom_size{};
+    // apply geometry parameters
+    for (auto i: geoms_id) {
+        auto p = _geometry_params[i];
+        auto param_offset = p.param_offset();
+        auto buffer_view = p.buffer();
+        auto length = buffer_view.size();
+        geom_param.push_back(buffer_view.as<float>().native_handle());
+        geom_size.push_back(length*8u);
+    }
+    return std::make_tuple(geom_param, geom_size);
 }
  
 std::tuple<luisa::vector<void *>, luisa::vector<void *>> Differentiation::get_gradients(Stream &stream) {
@@ -527,10 +537,11 @@ std::tuple<luisa::vector<void *>, luisa::vector<void *>> Differentiation::get_gr
     // apply geometry parameters
     for (auto &&p : _geometry_params) {
         auto param_offset = p.param_offset();
-        auto buffer_id = p.buffer_id();
-        auto [buffer_view, bindlessbuffer_id] = _pipeline.bindless_arena_buffer<Vertex>(buffer_id);
+        auto buffer_view = p.buffer();
         auto length = buffer_view.size();
-        geom_res.push_back(_param_grad_buffer->subview(param_offset, length).as<float>().native_handle());
+        LUISA_INFO("here length is {}",length);
+        auto geom_grad_buf_view = _param_grad_buffer->subview(param_offset, length);
+        geom_res.push_back(reinterpret_cast<void*>(reinterpret_cast<uint64_t>(geom_grad_buf_view.native_handle())+geom_grad_buf_view.offset_bytes()));
     }
     return std::make_tuple(texture_res, geom_res);
 }

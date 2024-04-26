@@ -176,6 +176,10 @@ public:
     void update_parameter_from_external(Stream &stream, luisa::vector<uint> &constants_id, luisa::vector<float4> &constants, luisa::vector<uint> &textures_id, 
     luisa::vector<Buffer<float4>> &textures, luisa::vector<uint> &geoms_id, luisa::vector<Buffer<float>> &geoms) noexcept;
 
+    std::tuple<luisa::vector<void *>, luisa::vector<uint>> get_parameter_from_external
+    (Stream &stream, luisa::vector<uint> &constants_id, luisa::vector<uint> &textures_id, luisa::vector<uint> &geoms_id) noexcept;
+
+
 public:
     [[nodiscard]] Float4 decode(const ConstantParameter &param) const noexcept;
     void accumulate(const ConstantParameter &param, Expr<float4> grad, Expr<uint> slot_seed) const noexcept;

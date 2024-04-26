@@ -587,8 +587,6 @@ protected:
         auto photon_per_iter = node<MegakernelPhotonMappingDiff>()->photon_per_iter();
         auto pixel_count = resolution.x * resolution.y;
         auto spectrum = camera->pipeline().spectrum();
-
-        
         
         uint add_x = (photon_per_iter + resolution.y - 1) / resolution.y;
         sampler()->reset(command_buffer, make_uint2(resolution.x + add_x, resolution.y), pixel_count + add_x * resolution.y, spp);
@@ -1386,9 +1384,9 @@ protected:
                                 $if(dis <= rad) {
                                     auto viewpoint_beta = viewpoints->beta(viewpoint_index);
                                     auto viewpoint_wo = viewpoints->wo(viewpoint_index);
-                                    auto bary = bary_coords[path_size];
-                                    auto instance = pipeline().geometry()->instance(inst_ids[0]);
-                                    auto triangle = pipeline().geometry()->triangle(instance, triangle_ids[0]);
+                                    auto bary = it->bary_coord();
+                                    auto instance = pipeline().geometry()->instance(it->instance_id());
+                                    auto triangle = pipeline().geometry()->triangle(instance, it->triangle_id());
                                     auto v_buffer = instance.vertex_buffer_id();
                                     auto v0 = pipeline().buffer<Vertex>(v_buffer).read(triangle.i0);
                                     auto v1 = pipeline().buffer<Vertex>(v_buffer).read(triangle.i1);
@@ -1410,18 +1408,32 @@ protected:
                                         requires_grad(bary, beta_diff);
                                         Float3 photon_pos = point_0 * bary[0] + point_1 * bary[1] + point_2 * (1 - bary[0] - bary[1]);
                                         auto rel_dis_diff = distance(position, photon_pos) / rad;
-                                        auto weight = 3.5f*(1- 6*pow(rel_dis_diff, 5.) + 15*pow(rel_dis_diff, 4.) - 10*pow(rel_dis_diff, 3.));
+                                        auto rel3 = rel_dis_diff*rel_dis_diff*rel_dis_diff;
+                                        auto weight = 3.5f*(1- 6*rel3*rel_dis_diff*rel_dis_diff + 15*rel3*rel_dis_diff - 10*rel3);
                                         auto wi_local = it->shading().world_to_local(wi);
                                         auto Phi = spectrum->srgb(swl, viewpoint_beta * eval_viewpoint / abs_cos_theta(wi_local));
-                                        auto Phi_beta = Phi * beta_diff * weight;
+                                        auto Phi_beta = Phi * beta_diff * weight / 200000.0f;
                                         auto _grad_dimension = 3u;
-                                        auto grad_pixel_0 = grad_in->read(pixel_id*_grad_dimension+0);
+                                        auto grad_pixel_0 = grad_in->read(pixel_id * _grad_dimension + 0);
                                         auto grad_pixel_1 = grad_in->read(pixel_id * _grad_dimension + 1);
                                         auto grad_pixel_2 = grad_in->read(pixel_id * _grad_dimension + 2);
-                                        auto dldPhi = (Phi_beta[0]*grad_pixel_0 + Phi_beta[1]*grad_pixel_1 + Phi_beta[2]*grad_pixel_2) / indirect->cur_w(pixel_id);
+                                        auto dldPhi = (Phi_beta[0]*grad_pixel_0 + Phi_beta[1]*grad_pixel_1 + Phi_beta[2]*grad_pixel_2);
                                         backward(dldPhi);
-                                        grad_bary += grad(bary).xy();
+                                        auto grad_b = grad(bary).xy();
+                                        grad_bary += grad_b;
                                         grad_beta += grad(beta_diff);
+                                        // $if(viewpoint_index == 256*512+256) {
+                                        //     device_log("photon id: {}", photon_id_1d);
+                                        //     device_log("grad_pixel id: {} {} {}", grad_pixel_0,grad_pixel_1,grad_pixel_2);
+                                        //     device_log("Phi: {} {} {}", Phi[0u], Phi[1u], Phi[2u]);
+                                        //     device_log("beta: {} {} {}", beta[0u], beta[1u], beta[2u]);
+                                        //     device_log("rel_dis: {}", rel_dis_diff);
+                                        //     device_log("it p: {}", it->p());
+                                        //     device_log("photon_pos: {}", photon_pos);
+                                        //     device_log("weight: {}", weight);
+                                        //     device_log("bary: {} {} {}", bary[0], bary[1], bary[2]);
+                                        //     device_log("grad(bary): {} {}", grad_b[0u], grad_b[1u]);
+                                        // };
                                     };
                                     count_neighbors+=1;
                                 };
@@ -1432,8 +1444,8 @@ protected:
                 };
                 $if(count_neighbors>0){
                     tot_neighbors+=count_neighbors;
-                    grad_betas[path_size] = make_float3(grad_beta[0]/count_neighbors, grad_beta[1]/count_neighbors, grad_beta[2]/count_neighbors);
-                    grad_barys[path_size] = make_float2(grad_bary[0]/count_neighbors, grad_bary[1]/count_neighbors);
+                    grad_betas[path_size-1] = make_float3(grad_beta[0]/count_neighbors, grad_beta[1]/count_neighbors, grad_beta[2]/count_neighbors);
+                    grad_barys[path_size-1] = make_float2(grad_bary[0]/count_neighbors, grad_bary[1]/count_neighbors);
                 };
             };
             auto surface_tag = it->shape().surface_tag();
@@ -1475,8 +1487,10 @@ protected:
             };
         };
         $if(tot_neighbors>0)
-        //compute gradient w.r.t to photon position and power
         {
+            $if(photon_id==83274) {
+                device_log("path_size {} grad_barys: {}", path_size, grad_barys);
+            };
             EPSM_photon(path_size, points, normals, inst_ids, triangle_ids, bary_coords, etas, light_sample, grad_betas, grad_barys, mat_bary, mat_param);
         };
     }
@@ -1484,33 +1498,28 @@ protected:
     void EPSM_photon(UInt path_size, ArrayFloat3<4> &points, ArrayFloat3<4> &normals, ArrayUInt<4> &inst_ids, ArrayUInt<4> &triangle_ids, ArrayFloat3<4> &bary_coords, 
     ArrayFloat<4> &etas, LightSampler::Sample &light_sample, ArrayFloat3<4> grad_beta, ArrayFloat2<4> grad_bary, ArrayFloat<8 * 8 * 2> &mat_bary, ArrayFloat3<4 * 4> &mat_param){
     {
-        // change it to light sample: if env light use A else Use b
-        Callable create_local_frame = [](Float3 x) {
-            auto normal = normalize(x);
-            auto tangent = normalize(cross(normal, Float3(0,1,0)));
-            auto bitangent = normalize(cross(normal, tangent));
-            return Float3x3(tangent, bitangent, normal);
+        $if(path_size<2) {
+            return;
         };
-        
         // Shared<float> *mat_bary = new Shared<float>(16*16);
         // Shared<float3> *mat_param = new Shared<float3>(32);
 
         auto locate = [&](UInt i, UInt j) {
-            return (i<<5|j);
+            return (i<<4|j);
         };
         auto locate_adj = [&](UInt i, UInt j) {
-            return (i<<5|16|j);
+            return (i<<4|8|j);
         };
 
         Callable inverse_matrix = [&]() {
             //inverse a matrix which mat->read(i,j) gives the (i,j) element
-            auto n = path_size*2;
+            auto n = (path_size-1)*2;
             $for (i,n) {
                 mat_bary[locate_adj(i,i)] = 1;
             };
             $for (i, n) {
                 $if (mat_bary[locate(i,i)]==0) {
-                    auto p=n*2;
+                    auto p=n;
                     $for (j,i + 1, n) {
                         $if (mat_bary[locate(j,i)] != 0) {
                             p=j;
@@ -1532,49 +1541,47 @@ protected:
                     $if(j!=i)
                     {
                         auto factor = mat_bary[locate(j,i)]/mat_bary[locate(i,i)];
-                        $if(factor==0) {$break;};
                         $for (k,i,n) {
-                            //mat->set(pixel_id, j, k, mat->get(pixel_id, j, k) - factor * mat->get(pixel_id, i, k));
                             mat_bary[locate(j,k)] = mat_bary[locate(j,k)] - factor * mat_bary[locate(i,k)];
                         };
-                        
                         $for (k,n) {
                             mat_bary[locate_adj(j,k)] = mat_bary[locate_adj(j,k)] - factor * mat_bary[locate_adj(i,k)];
-                            //mat->set(pixel_id, j, k, mat->get(pixel_id, j, k+max_size*2) - factor * mat->get(pixel_id, i, k+max_size*2));
                         };
                     };
                 };
             };
             $for(i, n) {
                 auto f = mat_bary[locate(i,i)];
-                $for(j, n) {
+                $for(j,i,n) {
                     mat_bary[locate(i,j)] /= f;
+                };
+                $for(j, n) {
+                    mat_bary[locate_adj(i,j)] /= f;
                 };
             };
         };
         Callable compute_and_scatter_grad = [&](){
-            ArrayFloat<24> tmp;
-            $for(i, path_size*2){
+            ArrayFloat<8> tmp;
+            auto n = (path_size-1)*2;
+            $for(i, n){
                 tmp[i] = 0.0f;
-                $for(j, path_size){
+                $for(j, n/2){
                     tmp[i] -= grad_bary[j][0] * mat_bary[locate(j * 2, i)] + grad_bary[j][1] * mat_bary[locate(j * 2 + 1, i)];
                 };
-            };
-            $for(i, path_size) {
+            }; 
+            $for(i, n/2) {
                 Float3 grad_vertex = make_float3(0.0f), grad_normal = make_float3(0.0f);
-                grad_vertex = tmp[i*2+0]*mat_param[((i*2)<<2)+1] + tmp[i*2+1]*mat_param[((i*2+1)<<2)+1] + tmp[i*2+2]*mat_param[((i*2+2)<<2)] + tmp[i*2+3]*mat_param[((i*2+3)<<2)];
+                grad_vertex = tmp[i*2+0]*mat_param[((i*2)<<2)+1] + tmp[i*2+1]*mat_param[((i*2+1)<<2)+1];
                 grad_normal = tmp[i*2+0]*mat_param[((i*2)<<2)+3] + tmp[i*2+1]*mat_param[((i*2+1)<<2)+3];
+                $if(i<n/2-1){
+                    grad_vertex += tmp[i*2+2]*mat_param[((i*2+2)<<2)] + tmp[i*2+3]*mat_param[((i*2+3)<<2)];
+                };
                 $if(i > 0){
                     grad_vertex += tmp[i * 2 - 1] * mat_param[((i * 2 - 1) << 2) + 2] + tmp[i * 2 - 2] * mat_param[((i * 2 - 2) << 2) + 2];
                 };
-                pipeline().differentiation()->add_geom_gradients(grad_vertex, grad_normal, bary_coords[i], inst_ids[i], triangle_ids[i]);
-                
-                // pipeline().differentiation()->add_geom_gradients(grad_tmp, inst_ids[(UInt)(i/6)], triangle_ids[(UInt)(i/6)], i%6);
-                // pipeline().differentiation()->add_geom_gradients(grad_tmp, inst_ids[(UInt)(i/6)], triangle_ids[(UInt)(i/6)], i%6);
-                // pipeline().differentiation()->add_geom_gradients(grad_tmp, inst_ids[(UInt)(i/6)], triangle_ids[(UInt)(i/6)], i%6);
+                pipeline().differentiation()->add_geom_gradients(grad_vertex, grad_normal, bary_coords[i], inst_ids[i], triangle_ids[i]);                
             };
         };
-
         // Float3 point_pre = light_sample.second->origin();
         // Float2 bary_pre = Float2(0.0f);
         // Float2 bary_cur = bary_coords[0];
@@ -1591,12 +1598,10 @@ protected:
         auto point_pre_0 = v0->position();
         auto point_pre_1 = v1->position();
         auto point_pre_2 = v2->position();
-        auto bary_pre = bary_coords[0];
         
         auto point_cur_0 = v0->position();
         auto point_cur_1 = v1->position();
         auto point_cur_2 = v2->position();
-        auto bary_cur = bary_coords[0];
 
         $for(id, path_size-1){
             auto normal_cur_0 = v0->normal();
@@ -1611,119 +1616,80 @@ protected:
             auto point_nxt_0 = v0->position();
             auto point_nxt_1 = v1->position();
             auto point_nxt_2 = v2->position();
-            auto bary_nxt = bary_coords[id+1u];
             // point_nxt = points[id+1];
             // bary_nxt = bary_coords[id+1];
             // normal_cur = normals[id];
+            Float3 point_pre;
+            Float3 bary_pre, bary_cur, bary_nxt;
+            $if(id > 0) {
+                bary_pre = bary_coords[id - 1];
+                point_pre = point_pre_0 * bary_pre[0] + point_pre_1 * bary_pre[1] + point_pre_2 * (1 - bary_pre[0] - bary_pre[1]);
+            } $else {
+                bary_pre = bary_coords[0];
+                point_pre = light_sample.shadow_ray->origin();
+            };
+            bary_cur = bary_coords[id];
+            bary_nxt = bary_coords[id + 1];
+            ArrayFloat3<2> grad_uv_pre, grad_uv_cur, grad_uv_nxt;
             $autodiff {
-            // requires_grad(point_pre_0, point_pre_1, point_pre_2);
-            // requires_grad(point_cur_0, point_cur_1, point_cur_2);
-            // requires_grad(point_nxt_0, point_nxt_1, point_nxt_2);
-                Float3 point_pre,point_cur,point_nxt,normal_cur;
-                $if(id > 0) {
-                    point_pre = point_pre_0 * bary_pre[0] + point_pre_1 * bary_pre[1] + point_pre_2 * (1 - bary_pre[0] - bary_pre[1]);
-                } $else {
-                    point_pre = light_sample.shadow_ray->origin();
-                };
-                point_cur = point_cur_0*bary_cur[0]+point_cur_1*bary_cur[1]+point_cur_2*(1-bary_cur[0]-bary_cur[1]);
-                point_nxt = point_nxt_0*bary_nxt[0]+point_nxt_1*bary_nxt[1]+point_nxt_2*(1-bary_nxt[0]-bary_nxt[1]);
-                normal_cur = normal_cur_0*bary_cur[0]+normal_cur_1*bary_cur[1]+normal_cur_2*(1-bary_cur[0]-bary_cur[1]);
-                requires_grad(point_pre, point_cur, point_nxt, normal_cur);
+                // requires_grad(point_pre_0, point_pre_1, point_pre_2);
+                // requires_grad(point_cur_0, point_cur_1, point_cur_2);
+                // requires_grad(point_nxt_0, point_nxt_1, point_nxt_2);
+                //bary_pre = bary_coords[0];
+                //point_pre = light_sample.shadow_ray->origin();
                 requires_grad(bary_pre, bary_cur, bary_nxt);
-
-                auto trans_mat = create_local_frame(normal_cur);
+                Float3 point_cur = point_cur_0*bary_cur[0]+point_cur_1*bary_cur[1]+point_cur_2*(1-bary_cur[0]-bary_cur[1]);
+                Float3 point_nxt = point_nxt_0*bary_nxt[0]+point_nxt_1*bary_nxt[1]+point_nxt_2*(1-bary_nxt[0]-bary_nxt[1]);
+                Float3 normal_cur = normal_cur_0*bary_cur[0]+normal_cur_1*bary_cur[1]+normal_cur_2*(1-bary_cur[0]-bary_cur[1]);
+                requires_grad(point_pre, point_cur, point_nxt, normal_cur);
                 auto wi = normalize(point_pre-point_cur);
                 auto wo = normalize(point_nxt-point_cur);
-                auto wi_local = trans_mat*wi;
-                auto wo_local = trans_mat*wo;
+                auto f = Frame::make(normal_cur);
+                auto wi_local = f.world_to_local(wi);
+                auto wo_local = f.world_to_local(wo);
                 auto res = normalize(wi_local+wo_local*etas[id]);   
-
-                for(int j=0;j<2;j++)
-                {
-                    backward(res[j]);
-                    $if(id>0)
-                    {
-                        // mat->set(pixel_id_1d, id * 2 - 2 + j, 2 * id - 3, grad_uv_pre[0]);
-                        // mat->set(pixel_id_1d, id * 2 - 2 + j, 2 * id - 2, grad_uv_pre[1]);
-                        auto grad_uv_pre = grad(bary_pre);
-                        mat_bary[((((id)<<1)|j)<<4)|(((id)<<1)-2)] = grad_uv_pre[0];
-                        mat_bary[((((id)<<1)|j)<<4)|(((id)<<1)-1)] = grad_uv_pre[1];
-                    };
-                    auto grad_uv_cur = grad(bary_cur);
-                    auto grad_uv_nxt = grad(bary_nxt);
-                    
-                    mat_bary[((((id)<<1)|j)<<4)|(((id)<<1)+0)] = grad_uv_cur[0];
-                    mat_bary[((((id)<<1)|j)<<4)|(((id)<<1)+1)] = grad_uv_cur[1];
-                    
-                    mat_bary[((((id)<<1)|j)<<4)|(((id)<<1)+2)] = grad_uv_nxt[0];
-                    mat_bary[((((id)<<1)|j)<<4)|(((id)<<1)+3)] = grad_uv_nxt[1];
-
-                    // mat->set(pixel_id_1d, id * 2 - 2 + j, 2 * id - 1, grad_uv_cur[0]);
-                    // mat->set(pixel_id_1d, id * 2 - 2 + j, 2 * id + 0, grad_uv_cur[1]);
-                    // mat->set(pixel_id_1d, id * 2 - 2 + j, 2 * id + 1, grad_uv_nxt[0]);
-                    // mat->set(pixel_id_1d, id * 2 - 2 + j, 2 * id + 2, grad_uv_nxt[1]);
-                    // $if(id>0){
-                    // };
-
-                    mat_param[((((id)<<1)|j)<<2)] = grad(point_pre);
-                    mat_param[((((id)<<1)|j)<<2)|1] = grad(point_cur);
-                    mat_param[((((id)<<1)|j)<<2)|2] = grad(point_nxt);
-                    mat_param[((((id)<<1)|j)<<2)|3] = grad(normal_cur);
-                    // auto point_pre_0_grad = grad(point_pre_0);
-                    // mat_param->set(pixel_id_1d, id * 2 - 2 + j, 18 * (id - 1) + 0, point_pre_0_grad[0]);
-                    // mat_param->set(pixel_id_1d, id * 2 - 2 + j, 18 * (id - 1) + 1, point_pre_0_grad[1]);
-                    // mat_param->set(pixel_id_1d, id * 2 - 2 + j, 18 * (id - 1) + 2, point_pre_0_grad[2]);
-                    // auto point_pre_1_grad = grad(point_pre_1);
-                    // mat_param->set(pixel_id_1d, id * 2 - 2 + j, 18 * (id - 1) + 3, point_pre_1_grad[0]);
-                    // mat_param->set(pixel_id_1d, id * 2 - 2 + j, 18 * (id - 1) + 4, point_pre_1_grad[1]);
-                    // mat_param->set(pixel_id_1d, id * 2 - 2 + j, 18 * (id - 1) + 5, point_pre_1_grad[2]);
-                    // auto point_pre_2_grad = grad(point_pre_2);
-                    // mat_param->set(pixel_id_1d, id * 2 - 2 + j, 18 * (id - 1) + 6, point_pre_2_grad[0]);
-                    // mat_param->set(pixel_id_1d, id * 2 - 2 + j, 18 * (id - 1) + 7, point_pre_2_grad[1]);
-                    // mat_param->set(pixel_id_1d, id * 2 - 2 + j, 18 * (id - 1) + 8, point_pre_2_grad[2]);
-
-                    // auto point_nxt_0_grad = grad(point_nxt_0);
-                    // mat_param->set(pixel_id_1d, id * 2 - 2 + j, 18 * (id + 1) + 0, point_nxt_0_grad[0]);
-                    // mat_param->set(pixel_id_1d, id * 2 - 2 + j, 18 * (id + 1) + 1, point_nxt_0_grad[1]);
-                    // mat_param->set(pixel_id_1d, id * 2 - 2 + j, 18 * (id + 1) + 2, point_nxt_0_grad[2]);
-                    // auto point_nxt_1_grad = grad(point_nxt_1);
-                    // mat_param->set(pixel_id_1d, id * 2 - 2 + j, 18 * (id + 1) + 3, point_nxt_1_grad[0]);
-                    // mat_param->set(pixel_id_1d, id * 2 - 2 + j, 18 * (id + 1) + 4, point_nxt_1_grad[1]);
-                    // mat_param->set(pixel_id_1d, id * 2 - 2 + j, 18 * (id + 1) + 5, point_nxt_1_grad[2]);
-                    // auto point_nxt_2_grad = grad(point_nxt_2);
-                    // mat_param->set(pixel_id_1d, id * 2 - 2 + j, 18 * (id + 1) + 6, point_nxt_2_grad[0]);
-                    // mat_param->set(pixel_id_1d, id * 2 - 2 + j, 18 * (id + 1) + 7, point_nxt_2_grad[1]);
-                    // mat_param->set(pixel_id_1d, id * 2 - 2 + j, 18 * (id + 1) + 8, point_nxt_2_grad[2]);
-
-                    // auto point_cur_0_grad = grad(point_cur_0);
-                    // mat_param->set(pixel_id_1d, id * 2 - 2 + j, 18 * (id) + 0, point_cur_0_grad[0]);
-                    // mat_param->set(pixel_id_1d, id * 2 - 2 + j, 18 * (id) + 1, point_cur_0_grad[1]);
-                    // mat_param->set(pixel_id_1d, id * 2 - 2 + j, 18 * (id) + 2, point_cur_0_grad[2]);
-                    // auto point_cur_1_grad = grad(point_cur_1);
-                    // mat_param->set(pixel_id_1d, id * 2 - 2 + j, 18 * (id) + 3, point_cur_1_grad[0]);
-                    // mat_param->set(pixel_id_1d, id * 2 - 2 + j, 18 * (id) + 4, point_cur_1_grad[1]);
-                    // mat_param->set(pixel_id_1d, id * 2 - 2 + j, 18 * (id) + 5, point_cur_1_grad[2]);
-                    // auto point_cur_2_grad = grad(point_cur_2);
-                    // mat_param->set(pixel_id_1d, id * 2 - 2 + j, 18 * (id) + 6, point_cur_2_grad[0]);
-                    // mat_param->set(pixel_id_1d, id * 2 - 2 + j, 18 * (id) + 7, point_cur_2_grad[1]);
-                    // mat_param->set(pixel_id_1d, id * 2 - 2 + j, 18 * (id) + 8, point_cur_2_grad[2]);
-                    
-                    // auto normal_cur_0_grad = grad(point_cur_0);
-                    // mat_param->set(pixel_id_1d, id * 2 - 2 + j, 18 * (id) + 9, normal_cur_0_grad[0]);
-                    // mat_param->set(pixel_id_1d, id * 2 - 2 + j, 18 * (id) + 10, normal_cur_0_grad[1]);
-                    // mat_param->set(pixel_id_1d, id * 2 - 2 + j, 18 * (id) + 11, normal_cur_0_grad[2]);
-                    // auto normal_cur_1_grad = grad(point_cur_1);
-                    // mat_param->set(pixel_id_1d, id * 2 - 2 + j, 18 * (id) + 12, normal_cur_1_grad[0]);
-                    // mat_param->set(pixel_id_1d, id * 2 - 2 + j, 18 * (id) + 13, normal_cur_1_grad[1]);
-                    // mat_param->set(pixel_id_1d, id * 2 - 2 + j, 18 * (id) + 14, normal_cur_1_grad[2]);
-                    // auto normal_cur_2_grad = grad(point_cur_2);
-                    // mat_param->set(pixel_id_1d, id * 2 - 2 + j, 18 * (id) + 15, normal_cur_2_grad[0]);
-                    // mat_param->set(pixel_id_1d, id * 2 - 2 + j, 18 * (id) + 16, normal_cur_2_grad[1]);
-                    // mat_param->set(pixel_id_1d, id * 2 - 2 + j, 18 * (id) + 17, normal_cur_2_grad[2]);
-                }
+                backward(res[0]);
+                grad_uv_pre[0] = grad(bary_pre);
+                grad_uv_cur[0] = grad(bary_cur);
+                grad_uv_nxt[0] = grad(bary_nxt);
+                mat_param[((((id)<<1)|0)<<2)] = grad(point_pre);
+                mat_param[((((id)<<1)|0)<<2)|1] = grad(point_cur);
+                mat_param[((((id)<<1)|0)<<2)|2] = grad(point_nxt);
+                mat_param[((((id)<<1)|0)<<2)|3] = grad(normal_cur);
             };
-            bary_pre = bary_cur;
-            bary_cur = bary_nxt;
+            $autodiff {
+                requires_grad(bary_pre, bary_cur, bary_nxt);
+                Float3 point_cur = point_cur_0*bary_cur[0]+point_cur_1*bary_cur[1]+point_cur_2*(1-bary_cur[0]-bary_cur[1]);
+                Float3 point_nxt = point_nxt_0*bary_nxt[0]+point_nxt_1*bary_nxt[1]+point_nxt_2*(1-bary_nxt[0]-bary_nxt[1]);
+                Float3 normal_cur = normal_cur_0*bary_cur[0]+normal_cur_1*bary_cur[1]+normal_cur_2*(1-bary_cur[0]-bary_cur[1]);
+                requires_grad(point_pre, point_cur, point_nxt, normal_cur);
+                auto wi = normalize(point_pre-point_cur);
+                auto wo = normalize(point_nxt-point_cur);
+                auto f = Frame::make(normal_cur);
+                auto wi_local = f.world_to_local(wi);
+                auto wo_local = f.world_to_local(wo);
+                auto res = normalize(wi_local+wo_local*etas[id]);   
+                backward(res[1]);
+                grad_uv_pre[1] = grad(bary_pre);
+                grad_uv_cur[1] = grad(bary_cur);
+                grad_uv_nxt[1] = grad(bary_nxt);
+                mat_param[((((id)<<1)|1)<<2)] = grad(point_pre);
+                mat_param[((((id)<<1)|1)<<2)|1] = grad(point_cur);
+                mat_param[((((id)<<1)|1)<<2)|2] = grad(point_nxt);
+                mat_param[((((id)<<1)|1)<<2)|3] = grad(normal_cur);
+            };
+            for(uint j=0;j<2;j++)
+            {
+                $if(id>0)
+                {
+                    mat_bary[locate(id*2+j,id*2-2)] = grad_uv_pre[j][0];
+                    mat_bary[locate(id*2+j,id*2-1)] = grad_uv_pre[j][1];
+                };
+                mat_bary[locate(id*2+j,id*2+0)] = grad_uv_cur[j][0];
+                mat_bary[locate(id*2+j,id*2+1)] = grad_uv_cur[j][1];
+                mat_bary[locate(id*2+j,id*2+2)] = grad_uv_nxt[j][0];
+                mat_bary[locate(id*2+j,id*2+3)] = grad_uv_nxt[j][1];
+            }
             point_pre_0 = point_cur_0;
             point_pre_1 = point_cur_1;
             point_pre_2 = point_cur_2;

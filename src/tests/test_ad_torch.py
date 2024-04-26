@@ -97,41 +97,55 @@ differentiable_params_list = [
 ]
 
 luisarender.load_scene(gt_args)
-#target_img = cu_device_ptr_to_torch_tensor(luisarender.render()[0], (512, 512, 4)).clone()
-#imageio.imwrite("gt.exr",target_img.detach().cpu().numpy()[...,:3])
-#imgplot = plt.imshow(np.hstack([target_img.detach().cpu().numpy()[...,:3]]))
-#plt.show()]
-#imageio.imwrite('float_img.exr', arr)
+target_img = cu_device_ptr_to_torch_tensor(luisarender.render()[0], (512, 512, 4)).clone()
+imageio.imwrite("gt.exr",target_img.detach().cpu().numpy()[...,:3])
 
-vertex_pos = torch.zeros((61674,8),device='cuda')
-vertex_pos[...,1]=1.5
-pos_ptr = vertex_pos.contiguous().data_ptr()
-pos_size = np.prod(vertex_pos.shape)
-pos_dtype=float
-optimizer = torch.optim.Adam([vertex_pos], lr=0.001)
+#print(torch.max(target_img), torch.min(target_img), torch.sum(target_img))
 
 x = luisarender.ParamStruct()
 x.type = 'geom'
 x.id = 0
+[geom_ptr,geom_size] = luisarender.get_scene_param([x])
+geom_ptr_torch = cu_device_ptr_to_torch_tensor(geom_ptr[0], (geom_size[0]//8,8), dtype=cupy.float32)
+vertex_pos = geom_ptr_torch.clone()
+vertex_pos[...,1]=1.0
+vertex_pos[...,3]=0.0
+vertex_pos[...,4]=1.0
+vertex_pos[...,5]=0.0
+pos_ptr = vertex_pos.contiguous().data_ptr()
+pos_size = np.prod(vertex_pos.shape)
+pos_dtype=float
+
+optimizer = torch.optim.Adam([vertex_pos], lr=0.001)
 x.size = pos_size
 x.buffer_ptr = pos_ptr
+luisarender.update_scene([x])
 
+render_img = cu_device_ptr_to_torch_tensor(luisarender.render()[0], (512, 512,4)).clone()
+imageio.imwrite("init.exr",render_img.detach().cpu().numpy()[...,:3])
 
-#x.size = sphere_size
-#x.buffer_ptr = tex_ptr
+loss_func = torch.nn.MSELoss()
 
 for i in range(500):
-    luisarender.update_scene([x])
-    render_img = cu_device_ptr_to_torch_tensor(luisarender.render()[0], (512, 512,4)).clone()
-    imageio.imwrite("init.exr",render_img.detach().cpu().numpy()[...,:3])
-    print("sdlfjsdfkl")
-    exit()
-    cv2.imshow("render", cv2.cvtColor(render_img.detach().cpu().numpy()[...,:3], cv2.COLOR_BGR2RGB))
-    cv2.waitKey(0)
+    render_img = cu_device_ptr_to_torch_tensor(luisarender.render()[0], (512, 512, 4)).clone()
+    imageio.imwrite(f"render{i}.exr",render_img.detach().cpu().numpy()[...,:3])
     render_img.requires_grad_()
-    loss = torch.nn.MSELoss()(render_img,target_img)
+    #loss = loss_func(render_img,target_img)
+    loss = torch.sum((render_img-target_img)**2)
     loss.backward()
-    grad = render_img.grad
+    grad = render_img.grad[...,:3]
+    luisarender.render_backward([grad.contiguous().data_ptr()],[np.prod(grad.shape)])
+    tex_grad, geom_grad = luisarender.get_gradients()
+    geom_grad_torch = cu_device_ptr_to_torch_tensor(geom_grad[0], vertex_pos.shape, dtype=cupy.float32)
+    print(loss, torch.max(geom_grad_torch), torch.min(geom_grad_torch), geom_grad_torch.shape)
+    exit()
+    luisarender.update_scene([x])
+
+    #exit()
+    #optimizer.zero_grad()
+    #tex.grad = tex_grad_torch
+    #optimizer.step()    
+    #cv2.imshow("texture", cv2.cvtColor(tex.detach().cpu().numpy()[...,:3], cv2.COLOR_BGR2RGB))
     # print(grad)
     # grad_np = grad[...,1].detach().cpu().numpy()  # Convert the tensor to numpy for visualization
     # plt.imshow(grad_np, cmap='viridis')  # Use the 'viridis' color map
@@ -139,7 +153,6 @@ for i in range(500):
     # plt.show()
     # exit()
     #visualize grad with a color map
-
     # imgplot = plt.imshow(np.hstack([target_img.detach().cpu().numpy()[...,:3],render_img.detach().cpu().numpy()[...,:3],grad.detach().cpu().numpy()[...,:3]]))
     # plt.show()
     # exit()
@@ -149,15 +162,6 @@ for i in range(500):
     # imgplot = plt.imshow(img[...,:3])
     # plt.show()
     #print(grad,torch.nonzero(torch.isnan(grad.view(-1))))
-    luisarender.render_backward([grad.contiguous().data_ptr()],[np.prod(grad.shape)])
-    tex_grad, geom_grad = luisarender.get_gradients()
-    tex_grad_torch = cu_device_ptr_to_torch_tensor(tex_grad[0], tex.shape, dtype=cupy.float32)
-    optimizer.zero_grad()
-    tex.grad = tex_grad_torch
-    optimizer.step()    
-    cv2.imshow("texture", cv2.cvtColor(tex.detach().cpu().numpy()[...,:3], cv2.COLOR_BGR2RGB))
-cv2.waitKey(0)
-
 # img = tex_grad_torch.cpu().numpy().reshape(tex.shape)
 # imgplot = plt.imshow(img[...,:3])
 # print(tex_grad_torch)

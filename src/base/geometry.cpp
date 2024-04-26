@@ -221,7 +221,7 @@ luisa::shared_ptr<Interaction> Geometry::interaction(Expr<uint> inst_id, Expr<ui
     auto tri = triangle(shape, prim_id);
     auto attrib = shading_point(shape, tri, bary, m);
     return luisa::make_shared<Interaction>(
-        std::move(shape), inst_id, prim_id,
+        std::move(shape), inst_id, prim_id, bary, 
         attrib, dot(wo, attrib.g.n) < 0.0f);
 }
 
