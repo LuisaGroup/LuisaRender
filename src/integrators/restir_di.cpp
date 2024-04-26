@@ -89,12 +89,6 @@ public:
                 weight.target_pdf = r.weight.target_pdf;
             };
         }
-        void accept(const Reservoir &r, Expr<float> u_sel) noexcept {
-            $if(r.weight.total_weight > weight.total_weight | u_sel < r.weight.total_weight / weight.total_weight) {
-                sample = r.sample;
-                weight = r.weight;
-            };
-        }
     };
 
 private:
@@ -283,25 +277,31 @@ private:
                     };
                 };
             };
+            // perturb the light samples to reduce correlation, use Metropolis to determine whether to accept the perturbation
             $if(enable_decorrelation) {
                 $outline {
-                    auto constexpr num_perturb_iter = 10u;
+                    auto constexpr markov_chain_length = 16u;
                     auto sample_box_muller = [](Expr<float2> u) noexcept {
                         auto r = sqrt(clamp(-2.f * log(u.x), 0.f, 1.f));
                         auto theta = 2.f * pi * u.y;
                         return make_float2(r * cos(theta), r * sin(theta));
                     };
-                    // offset the sample location on the light surface
-                    $for(_, num_perturb_iter) {
+                    auto u_markov = sampler()->generate_1d();
+                    $for(markov_iter, markov_chain_length) {
+                        // offset the sample location on the light surface
                         auto candidate = reservoir;
-                        auto perturbation = 0.02f * sample_box_muller(sampler()->generate_2d());
+                        auto perturbation = 0.05f * sample_box_muller(sampler()->generate_2d());
                         candidate.sample.u_light_surface = clamp(reservoir.sample.u_light_surface + perturbation, 0.f, 1.f);
                         auto [L, pdf] = _evaluate_without_occlusion(candidate.sample, *it, wo, swl, time);
-                        $if(reservoir.weight.target_pdf > 0.f & pdf > 0.f) {
-                            auto target_pdf = L.sum();
-                            candidate.weight.total_weight *= target_pdf / candidate.weight.target_pdf;
-                            candidate.weight.target_pdf = target_pdf;
-                            reservoir.accept(candidate, sampler()->generate_1d());
+                        auto target_pdf = L.sum();
+                        candidate.weight.total_weight *= target_pdf / candidate.weight.target_pdf;
+                        candidate.weight.target_pdf = target_pdf;
+                        auto accepting_prob = min(1.f, candidate.weight.total_weight / reservoir.weight.total_weight);
+                        $if(u_markov < accepting_prob) {
+                            reservoir = candidate;
+                            u_markov /= accepting_prob;
+                        } $else {
+                            u_markov = (u_markov - accepting_prob) / (1.f - accepting_prob);
                         };
                     };
                 };
@@ -333,7 +333,7 @@ private:
         auto hit = _visibility_buffer->hit(pixel_id);
         auto num_neighbor_sample = ite(unbiased, 3u, 5u);
         auto constexpr neighbor_radius = 30.f;
-        auto reservoir = Reservoir::zero();
+        auto reservoir = _spatial_reservoir_buffer->read(pixel_id);
         $loop {
             auto wo = -ray->direction();
             auto it = pipeline().geometry()->interaction(ray, hit);
@@ -341,14 +341,13 @@ private:
             $if(!it->valid() | !it->shape().has_surface()) { $break; };
             // spatial reuse
             $outline {
-                reservoir = _spatial_reservoir_buffer->read(pixel_id);
-                auto valid_neighbor_array = ArrayUInt2<3u>();
-                auto valid_neighbor_m_array = ArrayFloat<3u>();
+                ArrayVar<Ray, 3u> valid_neighbor_ray_array;
+                ArrayVar<Hit, 3u> valid_neighbor_hit_array;
+                ArrayFloat<3u> valid_neighbor_m_array;
                 auto num_valid_neighbor = def(0u);
                 auto z = reservoir.weight.m;
-                auto camera_to_world = camera->camera_to_world();
-                auto world_to_camera = inverse(camera_to_world);
-                auto current_pixel_depth = (world_to_camera * make_float4(it->p(), 1.f)).z;
+                auto depth_projector = inverse(camera->camera_to_world())[2];
+                auto current_pixel_depth = dot(depth_projector.xyz(), it->p()) + depth_projector.w;
                 $for(_, num_neighbor_sample) {
                     auto u_radius = sampler()->generate_1d(), u_theta = sampler()->generate_1d();
                     auto radius = neighbor_radius * sqrt(u_radius);
@@ -359,7 +358,7 @@ private:
                     auto neighbor_hit = _visibility_buffer->hit(neighbor_id);
                     auto neighbor_it = pipeline().geometry()->interaction(neighbor_ray, neighbor_hit);
                     $if(neighbor_it->valid() & neighbor_it->shape().has_surface()) {
-                        auto neighbor_pixel_depth = (world_to_camera * make_float4(neighbor_it->p(), 1.f)).z;
+                        auto neighbor_pixel_depth = dot(depth_projector.xyz(), neighbor_it->p()) + depth_projector.w;
                         $if(abs(neighbor_pixel_depth - current_pixel_depth) < 0.05f * abs(current_pixel_depth) &
                             dot(it->ng(), neighbor_it->ng()) > 0.91f) {
                             auto neighbor_reservoir = Reservoir::zero();
@@ -372,7 +371,8 @@ private:
                                 neighbor_reservoir.weight.target_pdf = neighbor_target_pdf;
                                 reservoir.update(neighbor_reservoir, sampler()->generate_1d());
                                 $if(unbiased) {
-                                    valid_neighbor_array[num_valid_neighbor] = neighbor_id;
+                                    valid_neighbor_ray_array[num_valid_neighbor] = neighbor_ray;
+                                    valid_neighbor_hit_array[num_valid_neighbor] = neighbor_hit;
                                     valid_neighbor_m_array[num_valid_neighbor] = neighbor_reservoir.weight.m;
                                     num_valid_neighbor += 1u;
                                 };
@@ -381,11 +381,9 @@ private:
                     };
                 };
                 $if(unbiased) {
-
                     $for(neighbor_index, num_valid_neighbor) {
-                        auto neighbor_id = valid_neighbor_array[neighbor_index];
-                        auto neighbor_ray = _visibility_buffer->ray(neighbor_id);
-                        auto neighbor_hit = _visibility_buffer->hit(neighbor_id);
+                        auto neighbor_ray = valid_neighbor_ray_array[neighbor_index];
+                        auto neighbor_hit = valid_neighbor_hit_array[neighbor_index];
                         auto neighbor_it = pipeline().geometry()->interaction(neighbor_ray, neighbor_hit);
                         auto [L, _] = _evaluate_without_occlusion(reservoir.sample, *neighbor_it, -neighbor_ray->direction(), swl, time);
                         $if(any(L > 0.f)) {
