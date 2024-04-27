@@ -242,7 +242,7 @@ private:
                         ReservoirSample{sel.tag, u_light_selection},
                         ReservoirWeight{1.f, total_weight, target_pdf}};
                     auto [L, pdf] = _evaluate_without_occlusion(candidate.sample, *it, wo, swl, time);
-                    candidate.weight.target_pdf = L.sum();
+                    candidate.weight.target_pdf = pipeline().spectrum()->cie_y(swl, L);
                     candidate.weight.total_weight = ite(pdf == 0.f, 0.f, candidate.weight.target_pdf / pdf);
                     reservoir.update(candidate, sampler()->generate_1d());
                 };
@@ -268,7 +268,7 @@ private:
                         auto prev_frame_reservoir = _temporal_reservoir_buffer->read(make_uint2(prev_frame_pixel_id));
                         $if(!dsl::isnan(prev_frame_reservoir.weight.total_weight) & !dsl::isnan(prev_frame_reservoir.weight.target_pdf) & prev_frame_reservoir.weight.target_pdf > 0.f) {
                             auto [L, pdf] = _evaluate_without_occlusion(prev_frame_reservoir.sample, *it, wo, swl, time);
-                            auto target_pdf = L.sum();
+                            auto target_pdf = pipeline().spectrum()->cie_y(swl, L);
                             prev_frame_reservoir.weight.total_weight *= target_pdf / prev_frame_reservoir.weight.target_pdf;
                             prev_frame_reservoir.weight.target_pdf = target_pdf;
                             prev_frame_reservoir.weight.m = min(prev_frame_reservoir.weight.m, 20.f * reservoir.weight.m);
@@ -294,7 +294,7 @@ private:
                         candidate.sample.u_light_surface = reservoir.sample.u_light_surface + perturbation;
                         $if(any(candidate.sample.u_light_surface < 0.f) | any(candidate.sample.u_light_surface > 1.f)) { $continue; };
                         auto [L, pdf] = _evaluate_without_occlusion(candidate.sample, *it, wo, swl, time);
-                        candidate.weight.target_pdf = L.sum();
+                        candidate.weight.target_pdf = pipeline().spectrum()->cie_y(swl, L);
                         auto accepting_prob = candidate.weight.target_pdf / reservoir.weight.target_pdf;
                         candidate.weight.total_weight *= accepting_prob;
                         accepting_prob = min(1.f, accepting_prob);
@@ -367,7 +367,7 @@ private:
                             $if(dsl::isnan(neighbor_reservoir.weight.total_weight) | dsl::isnan(neighbor_reservoir.weight.target_pdf)) { $continue; };
                             auto [L, pdf] = _evaluate_without_occlusion(neighbor_reservoir.sample, *it, wo, swl, time);
                             $if(neighbor_reservoir.weight.target_pdf > 0.f) {
-                                auto neighbor_target_pdf = L.sum();
+                                auto neighbor_target_pdf = pipeline().spectrum()->cie_y(swl, L);
                                 neighbor_reservoir.weight.total_weight *= neighbor_target_pdf / neighbor_reservoir.weight.target_pdf;
                                 neighbor_reservoir.weight.target_pdf = neighbor_target_pdf;
                                 reservoir.update(neighbor_reservoir, sampler()->generate_1d());
@@ -460,7 +460,7 @@ private:
                                 $if(dsl::isnan(neighbor_reservoir.weight.total_weight) | dsl::isnan(neighbor_reservoir.weight.target_pdf)) { $continue; };
                                 auto [L, pdf] = _evaluate_without_occlusion(neighbor_reservoir.sample, *it, wo, swl, time);
                                 $if(neighbor_reservoir.weight.target_pdf > 0.f) {
-                                    auto neighbor_target_pdf = L.sum();
+                                    auto neighbor_target_pdf = pipeline().spectrum()->cie_y(swl, L);
                                     neighbor_reservoir.weight.total_weight *= neighbor_target_pdf / neighbor_reservoir.weight.target_pdf;
                                     neighbor_reservoir.weight.target_pdf = neighbor_target_pdf;
                                     reservoir.update(neighbor_reservoir, sampler()->generate_1d());
