@@ -138,7 +138,7 @@ for i in range(500):
     tex_grad, geom_grad = luisarender.get_gradients()
     geom_grad_torch = cu_device_ptr_to_torch_tensor(geom_grad[0], vertex_pos.shape, dtype=cupy.float32)
     print(loss, torch.max(geom_grad_torch), torch.min(geom_grad_torch), geom_grad_torch.shape)
-    exit()
+    #exit()
     luisarender.update_scene([x])
 
     #exit()

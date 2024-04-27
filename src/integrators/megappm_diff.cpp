@@ -1361,10 +1361,9 @@ protected:
             //path_size = depth;
             auto wi = -ray->direction();
             auto it = pipeline().geometry()->intersect(ray);
-
             // miss
             $if(!it->valid()) {
-                $if(photon_id_1d<1)
+                $if(photon_id_1d==node<MegakernelPhotonMappingDiff>()->debug_photon())
                 {
                     device_log("break it unvalid at size {} id {}", path_size, photon_id_1d);
                     device_log("ray {} {}", ray->origin(), ray->direction());
@@ -1373,14 +1372,12 @@ protected:
             };
 
             $if(!it->shape().has_surface()) { 
-                $if(photon_id_1d<1)
+                $if(photon_id_1d==node<MegakernelPhotonMappingDiff>()->debug_photon())
                 {
                     device_log("break it non surface {} ", photon_id_1d);
                 };
                 $break; 
             };
-            
-            
             // generate uniform samples
             auto u_lobe = sampler()->generate_1d();
             auto u_bsdf = sampler()->generate_2d();
@@ -1444,7 +1441,6 @@ protected:
                                         auto grad_b = grad(bary).xy();
                                         grad_bary += grad_b;
                                         grad_beta += grad(beta_diff);
-                                        
                                     };
                                     count_neighbors+=1;
                                 };
@@ -1488,7 +1484,7 @@ protected:
             });
             beta = zero_if_any_nan(beta);
             $if(beta.all([](auto b) noexcept { return b <= 0.f; })) { 
-                $if(photon_id_1d<1)
+                $if(photon_id_1d==node<MegakernelPhotonMappingDiff>()->debug_photon())
                 {
                     device_log("break beta negative {}",photon_id_1d);
                 };
@@ -1498,7 +1494,7 @@ protected:
             auto q = max(eta_scale, .05f);
             $if(depth + 1u >= rr_depth) {
                 $if(q < rr_threshold & u_rr >= q) { 
-                    $if(photon_id_1d<1)
+                    $if(photon_id_1d==node<MegakernelPhotonMappingDiff>()->debug_photon())
                     {
                         device_log("break rr {}",photon_id_1d);
                     };
@@ -1511,20 +1507,19 @@ protected:
             bary_coords[path_size] = it->bary_coord();
             points[path_size] = it->p();
             normals[path_size] = it->ng();
-            // $if(photon_id_1d<1)
+            // $if(photon_id_1d==node<MegakernelPhotonMappingDiff>()->debug_photon())
             // {
             //     device_log("adding path size {} id is {}",path_size,photon_id_1d);
             // };
             path_size = path_size+1u;
         };
-        $if(photon_id_1d<1){
-            device_log("path size is {} id is {}",path_size,photon_id_1d);
-            $for(i,path_size)
-            {    
-                device_log("{} point {} normal {} eta {}, bary {}",i, points[i], normals[i], etas[i], bary_coords[i]);
-            };
-            EPSM_photon(path_size, points, normals, inst_ids, triangle_ids, bary_coords, etas, light_sample, grad_betas, grad_barys, mat_bary, mat_param);
-        };
+        // $if(photon_id_1d==node<MegakernelPhotonMappingDiff>()->debug_photon()){
+        //     device_log("path size is {} id is {}",path_size,photon_id_1d);
+        //     $for(i,path_size)
+        //     {    
+        //         device_log("{} point {} normal {} eta {}, bary {}",i, points[i], normals[i], etas[i], bary_coords[i]);
+        //     };
+        // };
         // $if(path_size>=2u)
         // {
         //     device_log("path size is {}",path_size);
@@ -1536,20 +1531,16 @@ protected:
         //     return;
         //     EPSM_photon(path_size, points, normals, inst_ids, triangle_ids, bary_coords, etas, light_sample, grad_betas, grad_barys, mat_bary, mat_param);
         // };
-        $if(tot_neighbors>0)
+        $if(photon_id_1d<node<MegakernelPhotonMappingDiff>()->debug_photon())
         {
-            
+            $if(path_size>=2&path_size<=4) {
+                EPSM_photon(path_size, points, normals, inst_ids, triangle_ids, bary_coords, etas, light_sample, grad_betas, grad_barys, mat_bary, mat_param);
+            };
         };
     }
     void EPSM_photon(UInt path_size, ArrayFloat3<4> &points, ArrayFloat3<4> &normals, ArrayUInt<4> &inst_ids, ArrayUInt<4> &triangle_ids, ArrayFloat3<4> &bary_coords, 
     ArrayFloat<4> &etas, LightSampler::Sample &light_sample, ArrayFloat3<4> grad_beta, ArrayFloat2<4> grad_bary, ArrayFloat<8 * 8 * 2> &mat_bary, ArrayFloat3<8 * 4> &mat_param){
     {
-        $if(path_size<2|path_size>4) {
-            return;
-        };
-        // Shared<float> *mat_bary = new Shared<float>(16*16);
-        // Shared<float3> *mat_param = new Shared<float3>(32);
-
         auto locate = [&](UInt i, UInt j) {
             return (i<<4|j);
         };
@@ -1618,8 +1609,11 @@ protected:
                     tmp[i] -= grad_bary[j][0] * mat_bary[locate_adj(j * 2, i)] + grad_bary[j][1] * mat_bary[locate_adj(j * 2 + 1, i)];
                 };
             }; 
-            $for (i,8) {
-                device_log("mat_param {} {} {} {}",mat_param[i*4+0],mat_param[i*4+1],mat_param[i*4+2],mat_param[i*4+3]);
+            $if(node<MegakernelPhotonMappingDiff>()->debug())
+            {
+                $for (i,8) {
+                    device_log("mat_param {} {} {} {}",mat_param[i*4+0],mat_param[i*4+1],mat_param[i*4+2],mat_param[i*4+3]);
+                };
             };
             $for(i, n/2) {
                 Float3 grad_vertex = make_float3(0.0f), grad_normal = make_float3(0.0f);
@@ -1630,6 +1624,10 @@ protected:
                 };
                 $if(i<n/2-2){
                     grad_vertex += tmp[i*2+2]*mat_param[((i*2+2)<<2)] + tmp[i*2+3]*mat_param[((i*2+3)<<2)];
+                };
+                $if(node<MegakernelPhotonMappingDiff>()->debug())
+                {
+                    device_log("grad_vertex {} grad_normal {}",grad_vertex, grad_normal);
                 };
                 $if(inst_ids[i]==0)
                 {
