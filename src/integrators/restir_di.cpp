@@ -280,7 +280,7 @@ private:
             // perturb the light samples to reduce correlation, use Metropolis to determine whether to accept the perturbation
             $if(enable_decorrelation) {
                 $outline {
-                    auto constexpr markov_chain_length = 16u;
+                    auto constexpr markov_chain_length = 8u;
                     auto sample_box_muller = [](Expr<float2> u) noexcept {
                         auto r = sqrt(clamp(-2.f * log(u.x), 0.f, 1.f));
                         auto theta = 2.f * pi * u.y;
@@ -291,12 +291,13 @@ private:
                         // offset the sample location on the light surface
                         auto candidate = reservoir;
                         auto perturbation = 0.05f * sample_box_muller(sampler()->generate_2d());
-                        candidate.sample.u_light_surface = clamp(reservoir.sample.u_light_surface + perturbation, 0.f, 1.f);
+                        candidate.sample.u_light_surface = reservoir.sample.u_light_surface + perturbation;
+                        $if(any(candidate.sample.u_light_surface < 0.f) | any(candidate.sample.u_light_surface > 1.f)) { $continue; };
                         auto [L, pdf] = _evaluate_without_occlusion(candidate.sample, *it, wo, swl, time);
-                        auto target_pdf = L.sum();
-                        candidate.weight.total_weight *= target_pdf / candidate.weight.target_pdf;
-                        candidate.weight.target_pdf = target_pdf;
-                        auto accepting_prob = min(1.f, candidate.weight.total_weight / reservoir.weight.total_weight);
+                        candidate.weight.target_pdf = L.sum();
+                        auto accepting_prob = candidate.weight.target_pdf / reservoir.weight.target_pdf;
+                        candidate.weight.total_weight *= accepting_prob;
+                        accepting_prob = min(1.f, accepting_prob);
                         $if(u_markov < accepting_prob) {
                             reservoir = candidate;
                             u_markov /= accepting_prob;
