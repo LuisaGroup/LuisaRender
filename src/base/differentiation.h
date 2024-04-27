@@ -149,9 +149,9 @@ private:
     auto &pipeline() noexcept { return _pipeline; }
 
 public:
-    explicit Differentiation(Pipeline &pipeline) noexcept;
+    explicit Differentiation(Pipeline &pipeline, Stream &stream) noexcept;
     void register_optimizer(Optimizer::Instance *optimizer) noexcept;
-    void register_geometry_parameter(const CommandBuffer &command_buffer, Geometry::MeshData &mesh, Accel &accel, uint instance_id) noexcept;
+    void register_geometry_parameter(CommandBuffer &command_buffer, Geometry::MeshData &mesh, Accel &accel, uint instance_id) noexcept;
     [[nodiscard]] ConstantParameter parameter(float x, float2 range) noexcept;
     [[nodiscard]] ConstantParameter parameter(float2 x, float2 range) noexcept;
     [[nodiscard]] ConstantParameter parameter(float3 x, float2 range) noexcept;

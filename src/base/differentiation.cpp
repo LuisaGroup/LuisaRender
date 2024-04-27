@@ -18,11 +18,14 @@ namespace luisa::render {
 #define LUISA_RENDER_DIFFERENTIATION_DEBUG_2
 #define LUISA_RENDER_USE_BP_TIMES_NORMALIZATION
 
-Differentiation::Differentiation(Pipeline &pipeline) noexcept
+Differentiation::Differentiation(Pipeline &pipeline, Stream &stream) noexcept
     : _pipeline{pipeline},
       _gradient_buffer_size{constant_parameter_gradient_buffer_size},
       _param_buffer_size{constant_parameter_buffer_capacity * 4u},
-      _counter_size{constant_parameter_counter_size},_is_dirty(false) {
+      _counter_size{constant_parameter_counter_size},_is_dirty(false)
+    {
+
+    instance2offset.emplace(_pipeline.create<Buffer<uint>>(256u)->view());
 
     _constant_params.reserve(constant_parameter_buffer_capacity);
     _constant_ranges.reserve(constant_parameter_buffer_capacity);
@@ -87,6 +90,9 @@ Differentiation::Differentiation(Pipeline &pipeline) noexcept
         param_gradients.write(param_offset + index, grad);
     };
     _accumulate_grad_geom = _pipeline.device().compile(accumulate_grad_geom_kernel);
+
+    stream << _clear_uint_buffer(*instance2offset).dispatch(256);
+
 }
 
 Differentiation::ConstantParameter Differentiation::parameter(float4 x, uint channels, float2 range) noexcept {
@@ -133,8 +139,8 @@ void Differentiation::materialize(CommandBuffer &command_buffer) noexcept {
     _param_grad_buffer.emplace(pipeline().create<Buffer<float>>(std::max(_param_buffer_size, 1u))->view());
     _grad_buffer.emplace(pipeline().create<Buffer<float>>(std::max(_gradient_buffer_size, 1u))->view());
     _counter.emplace(pipeline().create<Buffer<uint>>(std::max(_counter_size, 1u))->view());
-    instance2offset.emplace(pipeline().create<Buffer<uint>>(256u)->view());
     clear_gradients(command_buffer);
+
 
     if (auto n = _constant_params.size()) {
         Kernel1D constant_params_range_kernel = [](BufferFloat2 params_range_buffer, BufferFloat2 ranges) noexcept {
@@ -188,7 +194,6 @@ void Differentiation::clear_gradients(CommandBuffer &command_buffer) noexcept {
     if (auto n = _counter_size) {
         command_buffer << _clear_uint_buffer(*_counter).dispatch(_counter->size());
     }
-    command_buffer << _clear_uint_buffer(*instance2offset).dispatch(256);
 }
 
 void Differentiation::accum_gradients(CommandBuffer &command_buffer) noexcept {
@@ -375,8 +380,13 @@ void Differentiation::accumulate(const Differentiation::TexturedParameter &param
 }
 
 void Differentiation::add_geom_gradients(Float3 grad_v, Float3 grad_n, Float3 weight, UInt inst_id, UInt triangle_id) noexcept {
-    auto gradient_offset = instance2offset.value()->read(inst_id)-1u;
-    $if(gradient_offset < 0) { return; };
+    
+    UInt gradient_offset = instance2offset.value()->read(inst_id);
+    $if(gradient_offset == 0u) { 
+        return; 
+    }; 
+    UInt real_grad_offset = gradient_offset-1;
+    device_log("instance_id is {} grad {}",inst_id, real_grad_offset);
 
     auto instance = pipeline().geometry()->instance(inst_id);
     auto triangle = pipeline().geometry()->triangle(instance, triangle_id);
@@ -450,8 +460,9 @@ void Differentiation::register_optimizer(Optimizer::Instance *optimizer) noexcep
     _optimizer = optimizer;
 }
 
-void Differentiation::register_geometry_parameter(const CommandBuffer &command_buffer, Geometry::MeshData& mesh, Accel& accel, uint instance_id) noexcept {
+void Differentiation::register_geometry_parameter(CommandBuffer &command_buffer, Geometry::MeshData& mesh, Accel& accel, uint instance_id) noexcept {
     
+    LUISA_INFO("register geometry parameter start");
     auto param_offset = _param_buffer_size;
     auto counter_offset = _counter_size;
     auto grad_offset = _gradient_buffer_size;
@@ -464,11 +475,12 @@ void Differentiation::register_geometry_parameter(const CommandBuffer &command_b
     _param_buffer_size = (_param_buffer_size + length + 8u) & ~0b11u;
     _gradient_buffer_size = (_gradient_buffer_size + length + 8u) & ~0b11u;
     _geometry_params.emplace_back(param_index, instance_id, grad_offset, param_offset, counter_offset, buffer_view, length, 0u, mesh.resource);
-
-    LUISA_INFO("buffer_view size is {}",buffer_view.size());
-    LUISA_INFO("working here, {}, {}, {}, Mesh with {} triangles.", length, _counter_size, _param_buffer_size, mesh.resource->triangle_count());
-    //instance2offset.value()->write(instance_id, grad_offset+1u);
-    //command_buffer << buffer.copy_to(_param_buffer->subview(param_offset, length));
+    Kernel1D write_i2o = [&](UInt instance_id, UInt grad_offset) noexcept {
+        instance2offset.value()->write(instance_id, grad_offset+1u);
+    };
+    auto write_i2o_shader = pipeline().device().compile(write_i2o);
+    command_buffer << write_i2o_shader(instance_id, grad_offset).dispatch(1u) << synchronize();
+    LUISA_INFO("register geometry parameter finished");
 }
 
 void Differentiation::update_parameter_from_external(Stream &stream, luisa::vector<uint> &constants_id, luisa::vector<float4> &constants, luisa::vector<uint> &textures_id, 
