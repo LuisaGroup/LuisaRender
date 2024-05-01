@@ -47,8 +47,8 @@ public:
         }
     }
 
-    // assume that the number of light instances is constant, hence no need to update the buffer.
-    void update(CommandBuffer &command_buffer) noexcept override {}
+    // assume that the number of light instances is constant, there is no need to update the buffer.
+    void update(CommandBuffer &command_buffer, float time) noexcept override {}
 
     [[nodiscard]] Float evaluate_selection(
         Expr<uint> tag, Expr<float3> p_from,

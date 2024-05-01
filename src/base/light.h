@@ -70,6 +70,7 @@ public:
         [[nodiscard]] auto time() const noexcept { return _time; }
         [[nodiscard]] virtual Evaluation evaluate(const Interaction &it_light,
                                                   Expr<float3> p_from) const noexcept = 0;
+        [[nodiscard]] virtual Float evaluate_luminance(const Interaction &it_light) const noexcept = 0;
         [[nodiscard]] virtual Sample sample(Expr<uint> light_inst_id,
                                             Expr<float3> p_from,
                                             Expr<float2> u) const noexcept = 0;
@@ -92,7 +93,6 @@ public:
             requires std::is_base_of_v<Light, T>
         [[nodiscard]] auto node() const noexcept { return static_cast<const T *>(_light); }
         [[nodiscard]] auto &pipeline() const noexcept { return _pipeline; }
-        [[nodiscard]] virtual float emission_power() const noexcept = 0;
         [[nodiscard]] virtual luisa::unique_ptr<Closure> closure(
             const SampledWavelengths &swl, Expr<float> time) const noexcept = 0;
     };

@@ -43,13 +43,6 @@ public:
         const Texture::Instance *texture) noexcept
         : Light::Instance{ppl, light}, _texture{texture} {}
     [[nodiscard]] auto texture() const noexcept { return _texture; }
-    [[nodiscard]] float emission_power() const noexcept override {
-        auto emission_power = node<DiffuseLight>()->scale();
-        $if(node<DiffuseLight>()->two_sided()) {
-            emission_power *= 2.0f;
-        };
-        return emission_power;
-    }
     [[nodiscard]] luisa::unique_ptr<Light::Closure> closure(
         const SampledWavelengths &swl, Expr<float> time) const noexcept override;
 };
@@ -116,6 +109,18 @@ public:
     [[nodiscard]] Light::Evaluation evaluate(const Interaction &it_light,
                                              Expr<float3> p_from) const noexcept override {
         return _evaluate(it_light, p_from);
+    }
+
+    [[nodiscard]] Float evaluate_luminance(const Interaction &it_light) const noexcept override {
+        auto light = instance<DiffuseLightInstance>();
+        auto &&pipeline = light->pipeline();
+        auto L = light->texture()->evaluate_illuminant_spectrum(it_light, swl(), time()).value *
+                 light->node<DiffuseLight>()->scale();
+        auto luminance = pipeline.spectrum()->cie_y(swl(), L);
+        $if(light->node<DiffuseLight>()->two_sided()) {
+            luminance *= 2.f;
+        };
+        return luminance;
     }
 
     [[nodiscard]] Light::Sample sample(Expr<uint> light_inst_id,
