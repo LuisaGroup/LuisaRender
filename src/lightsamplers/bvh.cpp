@@ -42,7 +42,13 @@ private:
     luisa::unique_ptr<Shader1D<uint>> _update_bvh_lut;
     luisa::unique_ptr<Shader1D<uint>> _clear_atomic_counter;
     luisa::unique_ptr<Shader1D<uint, uint>> _update_bvh_node;
+    BufferView<float4> _bvh_node_buffer_view;
+    BufferView<uint> _bvh_lut_buffer_view;
+    BufferView<float3> _object_space_aabb_buffer_view;
     BufferView<uint2> _morton_code_buffer_view;
+    BufferView<float3> _world_bounds_buffer_view;
+    BufferView<float4> _vpl_list_buffer_view;
+    BufferView<uint> _atomic_counter_buffer_view;
 
 public:
     BVHLightSamplerInstance(const BVHLightSampler *sampler, Pipeline &pipeline, CommandBuffer &command_buffer)
@@ -59,14 +65,20 @@ public:
             auto num_node = num_leaf_node + num_internal_node;
             auto [bvh_node_buffer_view, bvh_node_buffer_id] = pipeline.bindless_arena_buffer<float4>(num_node);
             _bvh_node_buffer_id = bvh_node_buffer_id;
+            _bvh_node_buffer_view = bvh_node_buffer_view;
             auto [bvh_lut_buffer_view, bvh_lut_buffer_id] = pipeline.bindless_arena_buffer<uint>(2u * num_light_inst);
             _bvh_lut_buffer_id = bvh_lut_buffer_id;
+            _bvh_lut_buffer_view = bvh_lut_buffer_view;
             auto [object_space_aabb_buffer_view, object_space_aabb_buffer_id] = pipeline.bindless_arena_buffer<float3>(2u * num_light_inst);
+            _object_space_aabb_buffer_view = object_space_aabb_buffer_view;
             auto [world_bounds_buffer_view, world_bounds_buffer_id] = pipeline.bindless_arena_buffer<float3>(2u);
+            _world_bounds_buffer_view = world_bounds_buffer_view;
             auto [vpl_list_buffer_view, vpl_list_buffer_id] = pipeline.bindless_arena_buffer<float4>(num_light_inst);
+            _vpl_list_buffer_view = vpl_list_buffer_view;
             auto [morton_code_buffer_view, morton_code_buffer_id] = pipeline.bindless_arena_buffer<uint2>(num_light_inst);
-            auto [atomic_counter_buffer_view, atomic_counter_buffer_id] = pipeline.bindless_arena_buffer<uint>(num_internal_node);
             _morton_code_buffer_view = morton_code_buffer_view;
+            auto [atomic_counter_buffer_view, atomic_counter_buffer_id] = pipeline.bindless_arena_buffer<uint>(num_internal_node);
+            _atomic_counter_buffer_view = atomic_counter_buffer_view;
             command_buffer << light_handle_buffer_view.copy_from(pipeline.geometry()->light_instances().data()) << commit();
             luisa::vector<uint> tag_lut(num_inst);
             for (auto i = 0u; i < num_light_inst; i++) {
@@ -78,8 +90,8 @@ public:
                 set_block_size(256u);
                 auto i = dispatch_id().x;
                 $while(i < n) {
-                    object_space_aabb_buffer_view->write(i, make_float3(std::numeric_limits<float>::max()));
-                    object_space_aabb_buffer_view->write(i + n, make_float3(-std::numeric_limits<float>::max()));
+                    _object_space_aabb_buffer_view->write(i, make_float3(std::numeric_limits<float>::max()));
+                    _object_space_aabb_buffer_view->write(i + n, make_float3(-std::numeric_limits<float>::max()));
                     i += dispatch_size().x;
                 };
             });
@@ -104,12 +116,12 @@ public:
                         p_max = max(p_max, max(p0, max(p1, p2)));
                         primitive_id += dispatch_size().x;
                     };
-                    object_space_aabb_buffer_view->atomic(tag).x.fetch_min(p_min.x);
-                    object_space_aabb_buffer_view->atomic(tag).y.fetch_min(p_min.y);
-                    object_space_aabb_buffer_view->atomic(tag).z.fetch_min(p_min.z);
-                    object_space_aabb_buffer_view->atomic(tag + n).x.fetch_max(p_max.x);
-                    object_space_aabb_buffer_view->atomic(tag + n).y.fetch_max(p_max.y);
-                    object_space_aabb_buffer_view->atomic(tag + n).z.fetch_max(p_max.z);
+                    _object_space_aabb_buffer_view->atomic(tag).x.fetch_min(p_min.x);
+                    _object_space_aabb_buffer_view->atomic(tag).y.fetch_min(p_min.y);
+                    _object_space_aabb_buffer_view->atomic(tag).z.fetch_min(p_min.z);
+                    _object_space_aabb_buffer_view->atomic(tag + n).x.fetch_max(p_max.x);
+                    _object_space_aabb_buffer_view->atomic(tag + n).y.fetch_max(p_max.y);
+                    _object_space_aabb_buffer_view->atomic(tag + n).z.fetch_max(p_max.z);
                     tag += 1u;
                 };
             });
@@ -117,11 +129,11 @@ public:
                 set_block_size(256u);
                 auto i = dispatch_id().x;
                 $if(i == 0u) {
-                    world_bounds_buffer_view->write(0u, make_float3(std::numeric_limits<float>::max()));
-                    world_bounds_buffer_view->write(1u, -make_float3(std::numeric_limits<float>::max()));
+                    _world_bounds_buffer_view->write(0u, make_float3(std::numeric_limits<float>::max()));
+                    _world_bounds_buffer_view->write(1u, -make_float3(std::numeric_limits<float>::max()));
                 };
                 $while(i < n) {
-                    vpl_list_buffer_view->write(i, make_float4(0.f));
+                    _vpl_list_buffer_view->write(i, make_float4(0.f));
                     i += dispatch_size().x;
                 };
             }));
@@ -137,17 +149,17 @@ public:
                     auto t = make_float3(object_to_world[3]);
                     auto primitive_id = dispatch_id().x;
                     $if(primitive_id == 0u) {
-                        auto centroid = (object_space_aabb_buffer_view->read(instance_id) + object_space_aabb_buffer_view->read(instance_id + n)) * .5f;
+                        auto centroid = (_object_space_aabb_buffer_view->read(instance_id) + _object_space_aabb_buffer_view->read(instance_id + n)) * .5f;
                         centroid = m * centroid + t;
-                        vpl_list_buffer_view->atomic(instance_id).x.exchange(centroid.x);
-                        vpl_list_buffer_view->atomic(instance_id).y.exchange(centroid.y);
-                        vpl_list_buffer_view->atomic(instance_id).z.exchange(centroid.z);
-                        world_bounds_buffer_view->atomic(0u).x.fetch_min(centroid.x);
-                        world_bounds_buffer_view->atomic(0u).y.fetch_min(centroid.y);
-                        world_bounds_buffer_view->atomic(0u).z.fetch_min(centroid.z);
-                        world_bounds_buffer_view->atomic(1u).x.fetch_max(centroid.x);
-                        world_bounds_buffer_view->atomic(1u).y.fetch_max(centroid.y);
-                        world_bounds_buffer_view->atomic(1u).z.fetch_max(centroid.z);
+                        _vpl_list_buffer_view->atomic(instance_id).x.exchange(centroid.x);
+                        _vpl_list_buffer_view->atomic(instance_id).y.exchange(centroid.y);
+                        _vpl_list_buffer_view->atomic(instance_id).z.exchange(centroid.z);
+                        _world_bounds_buffer_view->atomic(0u).x.fetch_min(centroid.x);
+                        _world_bounds_buffer_view->atomic(0u).y.fetch_min(centroid.y);
+                        _world_bounds_buffer_view->atomic(0u).z.fetch_min(centroid.z);
+                        _world_bounds_buffer_view->atomic(1u).x.fetch_max(centroid.x);
+                        _world_bounds_buffer_view->atomic(1u).y.fetch_max(centroid.y);
+                        _world_bounds_buffer_view->atomic(1u).z.fetch_max(centroid.z);
                     };
                     $while(primitive_id < light_inst.triangle_count()) {
                         auto triangle = pipeline.geometry()->triangle(light_inst, primitive_id);
@@ -170,24 +182,24 @@ public:
                         power += emission_luminance * surface_area;
                         primitive_id += dispatch_size().x;
                     };
-                    vpl_list_buffer_view->atomic(instance_id).w.fetch_add(power);
+                    _vpl_list_buffer_view->atomic(instance_id).w.fetch_add(power);
                     instance_id += 1u;
                 };
             }));
             _compute_morton_code = luisa::make_unique<Shader1D<uint>>(pipeline.device().compile<1>([&](UInt n) noexcept {
                 set_block_size(256u);
                 auto i = dispatch_id().x;
-                auto world_min = world_bounds_buffer_view->read(0u);
-                auto world_max = world_bounds_buffer_view->read(1u);
+                auto world_min = _world_bounds_buffer_view->read(0u);
+                auto world_max = _world_bounds_buffer_view->read(1u);
                 $while(i < n) {
-                    auto p = vpl_list_buffer_view->read(i).xyz();
+                    auto p = _vpl_list_buffer_view->read(i).xyz();
                     auto x = make_uint3(clamp((p - world_min) / (world_max - world_min + 1e-6f) * 1024.f, 0.f, 1023.f));
                     x = (x * 0x00010001u) & 0xFF0000FFu;
                     x = (x * 0x00000101u) & 0x0F00F00Fu;
                     x = (x * 0x00000011u) & 0xC30C30C3u;
                     x = (x * 0x00000005u) & 0x49249249u;
                     auto morton_code = 4u * x.z + 2u * x.y + x.x;
-                    morton_code_buffer_view->write(i, make_uint2(morton_code, i));
+                    _morton_code_buffer_view->write(i, make_uint2(morton_code, i));
                     i += dispatch_size().x;
                 };
             }));
@@ -195,9 +207,9 @@ public:
                 set_block_size(256u);
                 auto i = dispatch_id().x;
                 $while(i < n) {
-                    auto instance_id = morton_code_buffer_view->read(i).y;
-                    bvh_lut_buffer_view->write(i, instance_id);
-                    bvh_lut_buffer_view->write(instance_id + n, i);
+                    auto instance_id = _morton_code_buffer_view->read(i).y;
+                    _bvh_lut_buffer_view->write(i, instance_id);
+                    _bvh_lut_buffer_view->write(instance_id + n, i);
                     i += dispatch_size().x;
                 };
             }));
@@ -205,7 +217,7 @@ public:
                 set_block_size(256u);
                 auto i = dispatch_id().x;
                 $while(i < n) {
-                    atomic_counter_buffer_view->write(i, 0u);
+                    _atomic_counter_buffer_view->write(i, 0u);
                     i += dispatch_size().x;
                 };
             }));
@@ -215,25 +227,25 @@ public:
                 auto current = num_internal_node + leaf_id;
                 auto leaf_node = def<float4>(make_float4(0.f));
                 $if(leaf_id < num_light_inst) {
-                    auto vpl_id = bvh_lut_buffer_view->read(leaf_id);
-                    leaf_node = vpl_list_buffer_view->read(vpl_id);
+                    auto vpl_id = _bvh_lut_buffer_view->read(leaf_id);
+                    leaf_node = _vpl_list_buffer_view->read(vpl_id);
                 };
-                bvh_node_buffer_view->write(current, leaf_node);
+                _bvh_node_buffer_view->write(current, leaf_node);
                 $loop {
                     $if(current == 0u) {
                         $break;
                     };
                     current = (current - 1u) / 2u;
-                    auto atomic_flag = atomic_counter_buffer_view->atomic(current).fetch_add(1u);
+                    auto atomic_flag = _atomic_counter_buffer_view->atomic(current).fetch_add(1u);
                     $if(atomic_flag == 0u) { $break; };
-                    auto left_node = bvh_node_buffer_view->read(2u * current + 1u);
-                    auto right = bvh_node_buffer_view->read(2u * current + 2u);
-                    auto power = left_node.w + right.w;
+                    auto left_node = _bvh_node_buffer_view->read(2u * current + 1u);
+                    auto right_node = _bvh_node_buffer_view->read(2u * current + 2u);
+                    auto power = left_node.w + right_node.w;
                     auto centroid = def<float3>(make_float3(0.f));
                     $if(power > 0.f) {
-                        centroid = (left_node.xyz() * left_node.w + right.xyz() * right.w) / power;
+                        centroid = (left_node.xyz() * left_node.w + right_node.xyz() * right_node.w) / power;
                     };
-                    bvh_node_buffer_view->write(current, make_float4(centroid, power));
+                    _bvh_node_buffer_view->write(current, make_float4(centroid, power));
                 };
             }));
             command_buffer << synchronize();
@@ -361,9 +373,10 @@ public:
                 uu = (uu - left_prob) / (1.f - left_prob);
             };
         };
-        auto tag = pipeline().buffer<uint>(_bvh_lut_buffer_id).read(current - num_internal_node);
-        auto is_env = u < _env_prob;
-        return {.tag = ite(is_env, LightSampler::selection_environment, tag),
+        auto is_env = u < _env_prob | current >= num_internal_node + n;
+        return {.tag = ite(is_env,
+                           LightSampler::selection_environment,
+                           pipeline().buffer<uint>(_bvh_lut_buffer_id).read(current - num_internal_node)),
                 .prob = ite(is_env, _env_prob, prob)};
     }
 

@@ -123,7 +123,6 @@ public:
             command_buffer << _alias_table_buffer_view.copy_from(alias_table.data())
                            << _pdf_buffer_view.copy_from(pdf.data())
                            << commit();
-            command_buffer << synchronize();
         }
     }
 
