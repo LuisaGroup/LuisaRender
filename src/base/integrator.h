@@ -44,8 +44,9 @@ public:
         [[nodiscard]] auto light_sampler() noexcept { return _light_sampler.get(); }
         [[nodiscard]] auto light_sampler() const noexcept { return _light_sampler.get(); }
         virtual void render(Stream &stream) noexcept = 0;
-        virtual void render_backward(Stream &stream, luisa::vector<Buffer<float>> &grad_in) {
+        virtual luisa::vector<void *> render_backward(Stream &stream, luisa::vector<Buffer<float>> &grad_in) {
             LUISA_INFO("Not implemented!");
+            return luisa::vector<void *>{};
         };
         virtual luisa::vector<void*> render_with_return(Stream &stream) {
             LUISA_INFO("Not implemented!");
@@ -121,7 +122,7 @@ public:
         virtual void _render_one_camera_backward(CommandBuffer &command_buffer, uint iteration, Camera::Instance *camera, Buffer<float> & grad_in) noexcept;
         
     public:
-        void render_backward(Stream &stream, luisa::vector<Buffer<float>> &grad_in) noexcept override;
+        luisa::vector<void *> render_backward(Stream &stream, luisa::vector<Buffer<float>> &grad_in) noexcept override;
         Instance(Pipeline &pipeline, CommandBuffer &command_buffer,
                           const DifferentiableIntegrator *integrator) noexcept;
         ~Instance() noexcept override;

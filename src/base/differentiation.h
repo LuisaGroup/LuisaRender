@@ -66,16 +66,18 @@ public:
         uint _counter_offset;
         float2 _range;
         BufferView<Vertex> _buffer_view;
+        BufferView<int> _tri_buffer_view;
         uint _length;
         uint _buffer_id;
         Mesh *_mesh;
     public:
         GeometryParameter(uint index, uint instance_id, uint grad_offset, uint param_offset,
-                          uint counter_offset, BufferView<Vertex> buffer_view, uint length, uint buffer_id, Mesh *mesh) noexcept
+                          uint counter_offset, BufferView<Vertex> buffer_view, uint length, uint buffer_id, Mesh *mesh, BufferView<int> tri_buffer_view) noexcept
             : _index(index), _instance_id{instance_id}, _grad_offset{grad_offset}, _param_offset{param_offset},
-              _counter_offset{counter_offset}, _buffer_view{buffer_view}, _length(length), _buffer_id(buffer_id), _mesh(mesh) {}
+              _counter_offset{counter_offset}, _buffer_view{buffer_view}, _length(length), _buffer_id(buffer_id), _mesh(mesh), _tri_buffer_view(tri_buffer_view) {}
         [[nodiscard]] auto index() const noexcept { return _index; }
         [[nodiscard]] auto buffer() const noexcept { return _buffer_view; }
+        [[nodiscard]] auto tri_buffer() const noexcept { return _tri_buffer_view; }
         [[nodiscard]] auto buffer_id() const noexcept { return _buffer_id; }
         [[nodiscard]] auto instance_id() const noexcept { return _instance_id; }
         [[nodiscard]] auto gradient_buffer_offset() const noexcept { return _grad_offset; }
@@ -176,7 +178,7 @@ public:
     void update_parameter_from_external(Stream &stream, luisa::vector<uint> &constants_id, luisa::vector<float4> &constants, luisa::vector<uint> &textures_id, 
     luisa::vector<Buffer<float4>> &textures, luisa::vector<uint> &geoms_id, luisa::vector<Buffer<float>> &geoms) noexcept;
 
-    std::tuple<luisa::vector<void *>, luisa::vector<uint>> get_parameter_from_external
+    std::tuple<luisa::vector<void *>, luisa::vector<uint>,luisa::vector<void *>, luisa::vector<uint>> get_parameter_from_external
     (Stream &stream, luisa::vector<uint> &constants_id, luisa::vector<uint> &textures_id, luisa::vector<uint> &geoms_id) noexcept;
 
 

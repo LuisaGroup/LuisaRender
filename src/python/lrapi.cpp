@@ -207,14 +207,14 @@ PYBIND11_MODULE(_lrapi, m) {
     });
 
     m.def("render", []() {
-        LUISA_INFO("LuisaRender API render_scene");
+        //LUISA_INFO("LuisaRender API render_scene");
         auto res = scene_python._pipeline->render_with_return(*scene_python._stream);
         scene_python._stream->synchronize();
         std::vector<uint64_t> res_vec(res.size());
         for (int i = 0; i < res.size(); i++) {
             res_vec[i] = reinterpret_cast<uint64_t>(res[i]);
         }
-        LUISA_INFO("res_vec: {}",res_vec[0]);
+        //LUISA_INFO("res_vec: {}",res_vec[0]);
         return res_vec;
     });
 
@@ -225,7 +225,7 @@ PYBIND11_MODULE(_lrapi, m) {
 
 
     m.def("update_scene", [](std::vector<ParamStruct> params) {
-        LUISA_INFO("LuisaRender Update Scene");
+        //LUISA_INFO("LuisaRender Update Scene");
         luisa::vector<float4> constants{};
         luisa::vector<Buffer<float4>> textures{};
         luisa::vector<Buffer<float>> geoms{};
@@ -233,7 +233,7 @@ PYBIND11_MODULE(_lrapi, m) {
         luisa::vector<uint> textures_id{};
         luisa::vector<uint> geoms_id{};
         for (auto param: params) {
-            LUISA_INFO("Param: {} {} {} {} {}", param.type, param.id, param.size, param.buffer_ptr, param.value);
+            //LUISA_INFO("Param: {} {} {} {} {}", param.type, param.id, param.size, param.buffer_ptr, param.value);
             if(param.type == "constant") {
                 constants_id.push_back(param.id);
                 constants.push_back(param.value);
@@ -250,12 +250,12 @@ PYBIND11_MODULE(_lrapi, m) {
                 geoms.push_back(std::move(buffer));
             }
         }
-        LUISA_INFO("geom_id_size is {}", geoms_id.size());
+        //LUISA_INFO("geom_id_size is {}", geoms_id.size());
         scene_python._pipeline->differentiation()->update_parameter_from_external(*scene_python._stream, constants_id, constants, textures_id, textures, geoms_id, geoms);
     });
 
     m.def("get_scene_param", [](std::vector<ParamStruct> params) {
-        LUISA_INFO("LuisaRender API get_parameter start");
+        //LUISA_INFO("LuisaRender API get_parameter start");
         luisa::vector<uint> constants_id{};
         luisa::vector<uint> textures_id{};
         luisa::vector<uint> geoms_id{};
@@ -270,12 +270,14 @@ PYBIND11_MODULE(_lrapi, m) {
                 geoms_id.push_back(param.id);
             }
         }
-        auto [geom_param, geom_size] = scene_python._pipeline->differentiation()->get_parameter_from_external(*scene_python._stream, constants_id, textures_id, geoms_id);
+        auto [geom_param, geom_size, tri_param, tri_size] = scene_python._pipeline->differentiation()->get_parameter_from_external(*scene_python._stream, constants_id, textures_id, geoms_id);
         // std::vector<float> ret_con_param(constants_id.size());
         // std::vector<uint64_t> ret_tex_param(textures_id.size());
         // std::vector<uint> ret_tex_size(textures_id.size());
         std::vector<uint64_t> ret_geom_param(geoms_id.size());
         std::vector<uint> ret_geom_size(geoms_id.size());
+        std::vector<uint64_t> ret_tri_param(geoms_id.size());
+        std::vector<uint> ret_tri_size(geoms_id.size());
         // for (int i = 0; i < ret_con_param.size(); i++) {
         //     ret_con_param[i] = constant_param[i];
         // }
@@ -286,21 +288,30 @@ PYBIND11_MODULE(_lrapi, m) {
         for (int i = 0; i < ret_geom_param.size(); i++) {
             ret_geom_param[i] = reinterpret_cast<uint64_t>(geom_param[i]);
             ret_geom_size[i] = geom_size[i];
-            LUISA_INFO("LuisaRender API get_parameter {} {} {}", i, ret_geom_size[i], ret_geom_param[i]);
+            ret_tri_param[i] = reinterpret_cast<uint64_t>(tri_param[i]);
+            ret_tri_size[i] = tri_size[i];
+            //LUISA_INFO("LuisaRender API get_parameter {} {} {}", i, ret_geom_size[i], ret_geom_param[i]);
         }
-        LUISA_INFO("LuisaRender API get_parameter finish");
-        return std::make_tuple(ret_geom_param, ret_geom_size);
+        //LUISA_INFO("LuisaRender API get_parameter finish");
+        return std::make_tuple(ret_geom_param, ret_geom_size, ret_tri_param, ret_tri_size);
     });
 
     m.def("render_backward", [](std::vector<uint64_t> grad_ptr,std::vector<uint> sizes){
-        LUISA_INFO("LuisaRender API render_backward");
+        
+        //LUISA_INFO("LuisaRender API render_backward");
         //scene_python._pipeline->differentiation()->clear_gradients(*scene_python._stream);
         luisa::vector<Buffer<float>> grad_buffer{grad_ptr.size()};
         for (int i = 0; i < grad_ptr.size(); i++) {
             auto buffer = scene_python._pipeline->device().import_external_buffer<float>(reinterpret_cast<void *>(grad_ptr[i]),sizes[i]);
             grad_buffer[i] = std::move(buffer);
         }
-        scene_python._pipeline->render_diff(*scene_python._stream, grad_buffer);
+        auto res = scene_python._pipeline->render_diff(*scene_python._stream, grad_buffer);
+        scene_python._stream->synchronize();
+        std::vector<uint64_t> res_vec(res.size());
+        for (int i = 0; i < res.size(); i++) {
+            res_vec[i] = reinterpret_cast<uint64_t>(res[i]);
+        }
+        return res_vec;
     });
 
     m.def("get_gradients", [](){

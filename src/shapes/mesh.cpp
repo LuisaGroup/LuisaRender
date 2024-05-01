@@ -46,11 +46,10 @@ public:
             importer.SetPropertyInteger(
                 AI_CONFIG_PP_SBP_REMOVE, aiPrimitiveType_LINE | aiPrimitiveType_POINT);
             importer.SetPropertyFloat(AI_CONFIG_PP_GSN_MAX_SMOOTHING_ANGLE, 45.f);
-            auto import_flags = aiProcess_RemoveComponent | aiProcess_SortByPType |
-                                aiProcess_ValidateDataStructure | aiProcess_ImproveCacheLocality |
-                                aiProcess_PreTransformVertices | aiProcess_FindInvalidData |
+            
+            uint import_flags = aiProcess_PreTransformVertices |
                                 aiProcess_JoinIdenticalVertices;
-                            
+            //import_flags = 0u;      
             auto remove_flags = aiComponent_ANIMATIONS | aiComponent_BONEWEIGHTS |
                                 aiComponent_CAMERAS | aiComponent_LIGHTS |
                                 aiComponent_MATERIALS | aiComponent_TEXTURES |

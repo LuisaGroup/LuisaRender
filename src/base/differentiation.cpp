@@ -405,7 +405,8 @@ void Differentiation::add_geom_gradients(Float3 grad_v, Float3 grad_n, Float3 we
     _grad_buffer.value()->atomic(real_grad_offset + triangle.i1 * 8 + 3).fetch_add(grad_n[0] * weight[1]);
     _grad_buffer.value()->atomic(real_grad_offset + triangle.i1 * 8 + 4).fetch_add(grad_n[1] * weight[1]);
     _grad_buffer.value()->atomic(real_grad_offset + triangle.i1 * 8 + 5).fetch_add(grad_n[2] * weight[1]);
-
+    
+    //device_log("weight2 {}, grad_v {}, grad_offset {} triangle i2 {}",weight[2], grad_v, real_grad_offset, triangle.i2);
     _grad_buffer.value()->atomic(real_grad_offset + triangle.i2 * 8 + 0).fetch_add(grad_v[0] * weight[2]);
     _grad_buffer.value()->atomic(real_grad_offset + triangle.i2 * 8 + 1).fetch_add(grad_v[1] * weight[2]);
     _grad_buffer.value()->atomic(real_grad_offset + triangle.i2 * 8 + 2).fetch_add(grad_v[2] * weight[2]);
@@ -463,7 +464,7 @@ void Differentiation::register_optimizer(Optimizer::Instance *optimizer) noexcep
 
 void Differentiation::register_geometry_parameter(CommandBuffer &command_buffer, Geometry::MeshData& mesh, Accel& accel, uint instance_id) noexcept {
     
-    LUISA_INFO("register geometry parameter start");
+    //LUISA_INFO("register geometry parameter start");
     auto param_offset = _param_buffer_size;
     auto counter_offset = _counter_size;
     auto grad_offset = _gradient_buffer_size;
@@ -471,17 +472,32 @@ void Differentiation::register_geometry_parameter(CommandBuffer &command_buffer,
     //auto channels = 3u;
     //uint buffer_id = mesh.geometry_buffer_id_base;
     auto buffer_view = mesh.vertices;
+    
+    auto tri_buffer_view = mesh.triangles;
+    auto triangle_buffer_new = _pipeline.create<Buffer<int>>(tri_buffer_view.size() * 3);
+    auto triangle_buffer_new_view = triangle_buffer_new->view();
+
+    Kernel1D write_tri = [&]() noexcept {
+        auto x = dispatch_x();
+        auto tri = tri_buffer_view->read(x);
+        triangle_buffer_new_view->write(x * 3, (Int)(tri.i0));
+        triangle_buffer_new_view->write(x * 3 + 1, (Int)(tri.i1));
+        triangle_buffer_new_view->write(x * 3 + 2, (Int)(tri.i2));
+    };
+    auto write_tri_shader = pipeline().device().compile(write_tri);
+    command_buffer << write_tri_shader().dispatch(tri_buffer_view.size()) << synchronize();
+
     auto length = buffer_view.size() * 8;
     _counter_size = (_counter_size + length + 8u) & ~0b11u;
     _param_buffer_size = (_param_buffer_size + length + 8u) & ~0b11u;
     _gradient_buffer_size = (_gradient_buffer_size + length + 8u) & ~0b11u;
-    _geometry_params.emplace_back(param_index, instance_id, grad_offset, param_offset, counter_offset, buffer_view, length, 0u, mesh.resource);
+    _geometry_params.emplace_back(param_index, instance_id, grad_offset, param_offset, counter_offset, buffer_view, length, 0u, mesh.resource, triangle_buffer_new_view);
     Kernel1D write_i2o = [&](UInt instance_id, UInt grad_offset) noexcept {
         instance2offset.value()->write(instance_id, grad_offset+1u);
     };
     auto write_i2o_shader = pipeline().device().compile(write_i2o);
     command_buffer << write_i2o_shader(instance_id, grad_offset).dispatch(1u) << synchronize();
-    LUISA_INFO("register geometry parameter finished");
+    //LUISA_INFO("register geometry parameter finished");
 }
 
 void Differentiation::update_parameter_from_external(Stream &stream, luisa::vector<uint> &constants_id, luisa::vector<float4> &constants, luisa::vector<uint> &textures_id, 
@@ -495,7 +511,7 @@ void Differentiation::update_parameter_from_external(Stream &stream, luisa::vect
         stream << image.copy_from(textures[textures_id[i]]);
     }
 
-    LUISA_INFO("working on update paramaters {}",geoms_id.size());
+    //LUISA_INFO("working on update paramaters {}",geoms_id.size());
     // apply geometry parameters
     for (auto i=0;i<geoms_id.size();i++) {
         auto &&p = _geometry_params[geoms_id[i]];
@@ -503,25 +519,31 @@ void Differentiation::update_parameter_from_external(Stream &stream, luisa::vect
         auto buffer_view = p.buffer();
         //auto [buffer_view, bindlessbuffer_id] = _pipeline.bindless_arena_buffer<Vertex>(buffer_id);
         auto length = buffer_view.size();
-        LUISA_INFO("here length is {}, size is {}, as<vertex> size is {}",length,geoms[geoms_id[i]].view().size(),geoms[geoms_id[i]].view().as<Vertex>().size());
+        //LUISA_INFO("here length is {}, size is {}, as<vertex> size is {}",length,geoms[geoms_id[i]].view().size(),geoms[geoms_id[i]].view().as<Vertex>().size());
         stream << buffer_view.copy_from(geoms[geoms_id[i]].view().as<Vertex>()) << synchronize() << p.mesh()->build() << synchronize();
         _is_dirty = true;
     }
 }
 
-std::tuple<luisa::vector<void *>, luisa::vector<uint>> Differentiation::get_parameter_from_external(Stream &stream, luisa::vector<uint> &constants_id, luisa::vector<uint> &textures_id, luisa::vector<uint> &geoms_id) noexcept {
+std::tuple<luisa::vector<void *>, luisa::vector<uint>, luisa::vector<void *>, luisa::vector<uint>> Differentiation::get_parameter_from_external(Stream &stream, luisa::vector<uint> &constants_id, luisa::vector<uint> &textures_id, luisa::vector<uint> &geoms_id) noexcept {
     luisa::vector<void*> geom_param{};
     luisa::vector<uint> geom_size{};
+    luisa::vector<void*> tri_param{};
+    luisa::vector<uint> tri_size{};
     // apply geometry parameters
     for (auto i: geoms_id) {
         auto p = _geometry_params[i];
         auto param_offset = p.param_offset();
         auto buffer_view = p.buffer();
+        auto tri_buffer_view = p.tri_buffer();
         auto length = buffer_view.size();
+        auto tri_length = tri_buffer_view.size();
         geom_param.push_back(buffer_view.as<float>().native_handle());
         geom_size.push_back(length*8u);
+        tri_param.push_back(tri_buffer_view.native_handle());
+        tri_size.push_back(tri_length);
     }
-    return std::make_tuple(geom_param, geom_size);
+    return std::make_tuple(geom_param, geom_size, tri_param, tri_size);
 }
  
 std::tuple<luisa::vector<void *>, luisa::vector<void *>> Differentiation::get_gradients(Stream &stream) {
@@ -552,8 +574,8 @@ std::tuple<luisa::vector<void *>, luisa::vector<void *>> Differentiation::get_gr
         auto grad_offset = p.gradient_buffer_offset();
         auto buffer_view = p.buffer();
         auto length = buffer_view.size();
-        LUISA_INFO("here length is {}",length);
-        auto geom_grad_buf_view = _grad_buffer->subview(grad_offset, length);
+        //LUISA_INFO("here length is {}",length);
+        auto geom_grad_buf_view = _grad_buffer->subview(grad_offset, length*8);
         geom_res.push_back(reinterpret_cast<void*>(reinterpret_cast<uint64_t>(geom_grad_buf_view.native_handle())+geom_grad_buf_view.offset_bytes()));
     }
     return std::make_tuple(texture_res, geom_res);

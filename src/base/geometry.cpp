@@ -91,7 +91,7 @@ void Geometry::_process_shape(
                 command_buffer << alias_table_buffer_view.copy_from(alias_table.data())
                                << pdf_buffer_view.copy_from(pdf.data());
                 command_buffer << compute::commit();
-                auto geom = MeshGeometry{mesh, vertex_buffer_id, vertex_buffer->view()};
+                auto geom = MeshGeometry{mesh, vertex_buffer_id, vertex_buffer->view(),triangle_buffer->view()};
                 _mesh_cache.emplace(hash, geom);
                 return geom;
             }();
@@ -103,6 +103,7 @@ void Geometry::_process_shape(
             MeshData mesh_data{
                 .resource = mesh_geom.resource,
                 .vertices = mesh_geom.vertices,
+                .triangles = mesh_geom.triangles,
                 .shadow_term = encode_fixed_point(shape->has_vertex_normal() ? shape->shadow_terminator_factor() : 0.f),
                 .intersection_offset = encode_fixed_point(shape->intersection_offset_factor()),
                 .geometry_buffer_id_base = mesh_geom.buffer_id_base,
@@ -197,9 +198,9 @@ bool Geometry::update(CommandBuffer &command_buffer, float time) noexcept {
             //    _accel.set_prim_handle(t.instance_id(), (uint64_t)t.buffer().native_handle());
             //}
             //_pipeline.differentiation()->clear_dirty();
-            LUISA_INFO("start build accel");
+            //LUISA_INFO("start build accel");
             command_buffer << _accel.build() << synchronize();
-            LUISA_INFO("end build accel");
+            //LUISA_INFO("end build accel");
         }
     }
     return updated;

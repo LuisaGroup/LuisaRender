@@ -10,3 +10,6 @@ target_link_libraries(test_sky PRIVATE luisa-render-texture-sky-precompute)
 
 add_executable(test_sphere test_sphere.cpp)
 target_link_libraries(test_sphere PRIVATE luisa::render)
+
+add_executable(test_ad test_ad.cpp)
+target_link_libraries(test_ad PRIVATE luisa::render)

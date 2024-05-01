@@ -73,6 +73,10 @@ public:
         command_buffer << compute::synchronize();
         return _converted.native_handle();
     }
+    void* export_image_origin(CommandBuffer &command_bufferr) noexcept override {
+        _check_prepared();
+        return _image.native_handle();
+    }
     void download(CommandBuffer &command_buffer, float4 *framebuffer) const noexcept override;
     [[nodiscard]] Film::Accumulation read(Expr<uint2> pixel) const noexcept override;
     void release() noexcept override;

@@ -43,6 +43,7 @@ public:
         virtual void download(CommandBuffer &command_buffer, float4 *framebuffer) const noexcept = 0;
         virtual bool show(CommandBuffer &command_buffer) const noexcept { return false; }
         virtual void *export_image(CommandBuffer &command_buffer) { return nullptr; }
+        virtual void *export_image_origin(CommandBuffer &command_buffer) { return nullptr; }
         virtual void release() noexcept = 0;
     };
 

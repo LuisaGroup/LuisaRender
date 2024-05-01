@@ -33,6 +33,7 @@ Frame Frame::make(Expr<float3> n, Expr<float3> s) noexcept {
     return {ss, tt, n};
 }
 
+
 Float3 Frame::local_to_world(Expr<float3> d) const noexcept {
     return normalize(d.x * _s + d.y * _t + d.z * _n);
 }

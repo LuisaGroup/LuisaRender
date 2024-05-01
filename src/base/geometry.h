@@ -47,11 +47,13 @@ public:
         Mesh *resource;
         uint buffer_id_base;
         BufferView<Vertex> vertices;
+        BufferView<Triangle> triangles;
     };
 
     struct MeshData {
         Mesh *resource;
         BufferView<Vertex> vertices;
+        BufferView<Triangle> triangles;
         uint16_t shadow_term;
         uint16_t intersection_offset;
         uint geometry_buffer_id_base : 22;

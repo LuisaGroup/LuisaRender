@@ -169,17 +169,20 @@ DifferentiableIntegrator::Instance::Instance(
 
 DifferentiableIntegrator::Instance::~Instance() noexcept = default;
 
-void DifferentiableIntegrator::Instance::render_backward(Stream &stream, luisa::vector<Buffer<float>> &grad_in) noexcept {
+luisa::vector<void *> DifferentiableIntegrator::Instance::render_backward(Stream &stream, luisa::vector<Buffer<float>> &grad_in) noexcept {
     CommandBuffer command_buffer{&stream};
     pipeline().differentiation()->clear_gradients(command_buffer);
     LUISA_INFO("Gradients cleared.");
     assert(grad_in.size() == pipeline().camera_count());
+    luisa::vector<void *> result;
     for (auto i = 0u; i < pipeline().camera_count(); i++) {
         auto camera = pipeline().camera(i);
-        //auto pixel_count = resolution.x * resolution.y;
         camera->film()->prepare(command_buffer);
         _render_one_camera_backward(command_buffer, 0,  camera, grad_in[i]);
+        command_buffer << compute::synchronize();
+        result.push_back(camera->film()->export_image(command_buffer));
     }
+    return result;
 }
 
 void DifferentiableIntegrator::Instance::_render_one_camera_backward(

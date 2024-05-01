@@ -221,6 +221,7 @@ Camera::Sample Camera::Instance::generate_ray(Expr<uint2> pixel_coord, Expr<floa
     weight *= filter_weight;
     auto c2w = camera_to_world();
     auto o = make_float3(c2w * make_float4(ray->origin(), 1.f));
+    auto pixel_world = make_float3(c2w * make_float4(ray->direction() / ray->direction().z, 1.f));
     auto d = normalize(make_float3x3(c2w) * ray->direction());
     ray->set_origin(o);
     ray->set_direction(d);

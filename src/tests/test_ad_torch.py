@@ -33,29 +33,124 @@ def cu_device_ptr_to_torch_tensor(ptr, shape, dtype=cupy.float32):
 
     # Convert the CuPy ndarray to a DLPack tensor and then to a PyTorch tensor
     return torch.utils.dlpack.from_dlpack(array.toDlpack())
+    
+def compute_vertex_normals(vertex_pos, face_ids):
+    v0 = vertex_pos[face_ids[:, 0]]
+    v1 = vertex_pos[face_ids[:, 1]]
+    v2 = vertex_pos[face_ids[:, 2]]
+    face_normals = torch.cross(v1 - v0, v2 - v0)
+    vertex_normals = torch.zeros_like(vertex_pos)
+    vertex_normals[face_ids[:, 0]] += face_normals
+    vertex_normals[face_ids[:, 1]] += face_normals
+    vertex_normals[face_ids[:, 2]] += face_normals
+    vertex_normals_norm = vertex_normals/torch.norm(vertex_normals, dim=-1, keepdim=True)
+    return vertex_normals_norm
 
-# def torch_to_lc_buffer(tensor):
-#     assert tensor.dtype is torch.float32  # TODO
-#     size = np.prod(tensor.shape)
-#     buf = luisa.Buffer.import_external_memory(
-#         tensor.contiguous().data_ptr(),
-#         size, dtype=float)
-#     return buf
 
-# def lc_buffer_to_torch(buf):
-#     assert buf.dtype is float  # TODO
-#     shape = (buf.size,)
-#     return cu_device_ptr_to_torch_tensor(buf.native_handle, shape)
+gt_args = ["C:/Users/jiankai/anaconda3/Lib/site-packages/luisarender/dylibs","-b","cuda", "D:/Code/LuisaRender2/data/scenes/cbox_caustic.luisa"]
+init_args = ["C:/Users/jiankai/anaconda3/Lib/site-packages/luisarender/dylibs","-b","cuda", "D:/Code/LuisaRender2/data/scenes/cbox_caustic.luisa"]
 
-def is_torch_tensor(a):
-    return getattr(a, '__module__', None) == 'torch' \
-            and type(a).__name__ == 'Tensor'
+luisarender.load_scene(gt_args)
+x = luisarender.ParamStruct()
+x.type = 'geom'
+x.id = 0
+[geom_ptr,geom_size,face_ids,face_sizes] = luisarender.get_scene_param([x])
+geom_ptr_torch = cu_device_ptr_to_torch_tensor(geom_ptr[0], (geom_size[0]//8,8), dtype=cupy.float32)
+face_ids_torch= cu_device_ptr_to_torch_tensor(face_ids[0], (face_sizes[0]//3,3), dtype=cupy.int32)
+vertex_pos = geom_ptr_torch.clone()[...,:3]
+vertex = geom_ptr_torch.clone()
 
-def torch_ensure_grad_shape(a, b):
-    if is_torch_tensor(a) and a.dtype in [torch.float, torch.float32, torch.float64]:
-        return a.reshape(b.shape)
-    else:
-        return a
+# print(face_ids_torch,vertex)
+# exit()
+
+vertex_height = torch.ones((vertex_pos.shape[0]),dtype=torch.float32).cuda()
+optimizer = torch.optim.Adam([vertex_height], lr=0.001)
+vertex_height.requires_grad_()
+
+
+vertex_pos[...,1] = ((vertex_pos[...,1]-1)*0.05)+1
+gt_param = vertex_pos[...,1].clone()
+vertex_normal = compute_vertex_normals(vertex_pos, face_ids_torch)
+vertex[...,0:3] = vertex_pos
+vertex[...,3:6] = vertex_normal
+
+pos_ptr = vertex.contiguous().data_ptr()
+pos_size = np.prod(vertex.shape)
+pos_dtype=float
+
+x.size = pos_size
+x.buffer_ptr = pos_ptr
+
+torch.cuda.synchronize()
+luisarender.update_scene([x])
+target_img = cu_device_ptr_to_torch_tensor(luisarender.render()[0], (512, 512, 4)).clone()
+imageio.imwrite("gt_0.05.exr",target_img.detach().cpu().numpy()[...,:3])
+imageio.imwrite("gt.png",target_img.detach().cpu().numpy()[...,:3])
+
+#print(torch.max(target_img), torch.min(target_img), torch.sum(target_img))
+
+
+
+
+torch.cuda.synchronize()
+vertex_pos[...,1] = vertex_height
+vertex_normal = compute_vertex_normals(vertex_pos, face_ids_torch)
+vertex[...,0:3] = vertex_pos
+vertex[...,3:6] = vertex_normal
+luisarender.update_scene([x])
+
+render_img = cu_device_ptr_to_torch_tensor(luisarender.render()[0], (512, 512,4)).clone()
+imageio.imwrite("init.exr",render_img.detach().cpu().numpy()[...,:3])
+imageio.imwrite("init.png",render_img.detach().cpu().numpy()[...,:3])
+
+#exit()
+cm = plt.get_cmap('viridis')
+# Apply the colormap like a function to any array:
+
+for i in range(500):
+
+    vertex_pos = geom_ptr_torch.clone()[...,:3]
+    vertex_pos[...,1] = vertex_height
+    vertex_normal = compute_vertex_normals(vertex_pos, face_ids_torch)
+    vertex[...,0:3] = vertex_pos
+    vertex[...,3:6] = vertex_normal
+    torch.cuda.synchronize()
+    luisarender.update_scene([x])
+
+    render_img = cu_device_ptr_to_torch_tensor(luisarender.render()[0], (512, 512, 4)).clone()
+    imageio.imwrite(f"outputs/render{i}.exr",render_img.detach().cpu().numpy()[...,:3])
+    render_img.requires_grad_()
+    #loss = loss_func(render_img,target_img)
+    loss = torch.sum((render_img[400:,...]-target_img[400:,...])**2)
+    loss.backward()
+    grad = render_img.grad[...,:3]
+    #print("debug pixel", render_img[458, 210,:3], grad[458, 210,:3])
+    #exit()
+    aux_buffer = luisarender.render_backward([grad.contiguous().data_ptr()],[np.prod(grad.shape)])
+    aux_buffer_torch = cu_device_ptr_to_torch_tensor(aux_buffer[0],  (512, 512, 4), dtype=cupy.float32)
+    aux_buffer_numpy = aux_buffer_torch.cpu().numpy()
+
+    imageio.imwrite(f"outputs/backwarde_render_{i}.exr",aux_buffer_numpy[...,:3])
+
+    graddis_avg = aux_buffer_numpy[...,0]
+    mx = np.max(abs(graddis_avg))
+    print(mx, np.max(graddis_avg), np.min(graddis_avg))
+    grad_reldis_vis = cm(graddis_avg/mx)
+    imageio.imwrite(f"outputs/grad_vis_{i}.png",grad_reldis_vis)
+
+    exit()
+
+    tex_grad, geom_grad = luisarender.get_gradients()
+    geom_grad_torch = cu_device_ptr_to_torch_tensor(geom_grad[0], vertex.shape, dtype=cupy.float32)
+    #print(loss, geom_grad_torch)
+
+    vertex_height.grad = geom_grad_torch[...,1]
+    #vertex_normal.grad = geom_grad_torch[...,3:6]
+    vertex_normal.backward(geom_grad_torch[...,3:6])
+    optimizer.step()
+    print(loss, torch.sum((vertex_height-gt_param)**2))
+    #print(vertex_height)
+
 
 # def torch_to_luisa_scene(args):
 #     return tuple(torch_to_lc_buffer(a) if is_torch_tensor(a) else a for a in args)    
@@ -86,61 +181,6 @@ def torch_ensure_grad_shape(a, b):
 #     uint param_size;
 #     uint64_t param_buffer_ptr;
 #     float4 param_value;
-
-
-gt_args = ["C:/Users/jiankai/anaconda3/Lib/site-packages/luisarender/dylibs","-b","cuda", "D:/Code/LuisaRender2/data/scenes/cbox_caustic.luisa"]
-init_args = ["C:/Users/jiankai/anaconda3/Lib/site-packages/luisarender/dylibs","-b","cuda", "D:/Code/LuisaRender2/data/scenes/cbox_caustic.luisa"]
-
-differentiable_params_list = [
-    {"type":"mesh","idx":0,"param":"vertex_position"},
-    #{"type":"texture","idx":0,"param":"base_color"}
-]
-
-luisarender.load_scene(gt_args)
-target_img = cu_device_ptr_to_torch_tensor(luisarender.render()[0], (512, 512, 4)).clone()
-imageio.imwrite("gt.exr",target_img.detach().cpu().numpy()[...,:3])
-
-#print(torch.max(target_img), torch.min(target_img), torch.sum(target_img))
-
-x = luisarender.ParamStruct()
-x.type = 'geom'
-x.id = 0
-[geom_ptr,geom_size] = luisarender.get_scene_param([x])
-geom_ptr_torch = cu_device_ptr_to_torch_tensor(geom_ptr[0], (geom_size[0]//8,8), dtype=cupy.float32)
-vertex_pos = geom_ptr_torch.clone()
-vertex_pos[...,1]=1.0
-vertex_pos[...,3]=0.0
-vertex_pos[...,4]=1.0
-vertex_pos[...,5]=0.0
-pos_ptr = vertex_pos.contiguous().data_ptr()
-pos_size = np.prod(vertex_pos.shape)
-pos_dtype=float
-
-optimizer = torch.optim.Adam([vertex_pos], lr=0.001)
-x.size = pos_size
-x.buffer_ptr = pos_ptr
-luisarender.update_scene([x])
-
-render_img = cu_device_ptr_to_torch_tensor(luisarender.render()[0], (512, 512,4)).clone()
-imageio.imwrite("init.exr",render_img.detach().cpu().numpy()[...,:3])
-
-loss_func = torch.nn.MSELoss()
-
-for i in range(500):
-    render_img = cu_device_ptr_to_torch_tensor(luisarender.render()[0], (512, 512, 4)).clone()
-    imageio.imwrite(f"render{i}.exr",render_img.detach().cpu().numpy()[...,:3])
-    render_img.requires_grad_()
-    #loss = loss_func(render_img,target_img)
-    loss = torch.sum((render_img-target_img)**2)
-    loss.backward()
-    grad = render_img.grad[...,:3]
-    luisarender.render_backward([grad.contiguous().data_ptr()],[np.prod(grad.shape)])
-    tex_grad, geom_grad = luisarender.get_gradients()
-    geom_grad_torch = cu_device_ptr_to_torch_tensor(geom_grad[0], vertex_pos.shape, dtype=cupy.float32)
-    print(loss, torch.max(geom_grad_torch), torch.min(geom_grad_torch), geom_grad_torch.shape)
-    #exit()
-    luisarender.update_scene([x])
-
     #exit()
     #optimizer.zero_grad()
     #tex.grad = tex_grad_torch
