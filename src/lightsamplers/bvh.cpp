@@ -8,12 +8,12 @@
 
 namespace luisa::render {
     struct BVHPrimitive {
-        float x_min;
-        float y_min;
-        float z_min;
-        float x_max;
-        float y_max;
-        float z_max;
+        float x_min{};
+        float y_min{};
+        float z_min{};
+        float x_max{};
+        float y_max{};
+        float z_max{};
         float power{0.f};
         uint tag{0xffffffff};
         [[nodiscard]] float3 p_min() const noexcept { return make_float3(x_min, y_min, z_min); }
@@ -181,6 +181,7 @@ namespace luisa::render {
         uint right_child;
         uint first_primitive_offset;
         uint primitive_count;
+        uint lut_entry;
         [[nodiscard]] static auto encode(const BVHNode &node, float3 world_min, float3 world_max) noexcept {
             auto constexpr QUANTIZED_COORDINATE_BITS = 10u;
             auto constexpr MAX_COORDINATE_VALUE = static_cast<float>((1u << QUANTIZED_COORDINATE_BITS) - 1u);
@@ -204,22 +205,20 @@ namespace luisa::render {
     [[nodiscard]] luisa::vector<QBVHNode> encode_quantized_bvh(BVHNode *root, float3 world_min, float3 world_max) noexcept {
         luisa::vector<QBVHNode> quantized_nodes;
         quantized_nodes.reserve(root->size());
-        luisa::stack<std::pair<BVHNode *, uint>> stack; /* child node, parent node index */
+        luisa::stack<std::pair<BVHNode *, uint>> stack; // child node, parent node index
         stack.push({root, 0xffffffffu});
         while (!stack.empty()) {
             auto [node, parent_index] = stack.top();
             stack.pop();
             auto current_index = static_cast<uint>(quantized_nodes.size());
             quantized_nodes.push_back(QBVHNode::encode(*node, world_min, world_max));
-            if (parent_index != 0xffffffffu) {
-                quantized_nodes[current_index].parent = parent_index;
-                if (current_index != parent_index + 1u) {
-                    quantized_nodes[parent_index].right_child = current_index;
-                }
+            quantized_nodes[current_index].parent = parent_index;
+            if (current_index != parent_index + 1u) {
+                quantized_nodes[parent_index].right_child = current_index;
             }
             if (!node->is_leaf()) {
                 stack.push({node->right_child(), current_index});
-                stack.push({node->left_child(), current_index}); /* left child is traversed right after the current node, hence no need to store left child's index */
+                stack.push({node->left_child(), current_index});
             }
         }
         return quantized_nodes;
@@ -227,7 +226,7 @@ namespace luisa::render {
 } // namespace luisa::render
 
 LUISA_STRUCT(luisa::render::BVHPrimitive, x_min, y_min, z_min, x_max, y_max, z_max, power, tag){};
-LUISA_STRUCT(luisa::render::QBVHNode, quantized_p_min, quantized_p_max, power, parent, right_child, first_primitive_offset, primitive_count){};
+LUISA_STRUCT(luisa::render::QBVHNode, quantized_p_min, quantized_p_max, power, parent, right_child, first_primitive_offset, primitive_count, lut_entry){};
 
 namespace luisa::render {
 
@@ -252,13 +251,12 @@ class BVHLightSamplerInstance final : public LightSampler::Instance {
 private:
     luisa::shared_ptr<Shader1D<>> _clear_primitive_data;
     luisa::shared_ptr<Shader1D<float>> _update_primitive_data;
-    BufferView<float3> _world_bounds_buffer;
-    BufferView<BVHPrimitive> _bvh_primitive_buffer;
-    BufferView<QBVHNode> _quantized_bvh_node_buffer;
-    BufferView<uint> _bvh_leaf_lut_buffer;
+    Buffer<float3> _world_bounds_buffer;
+    Buffer<BVHPrimitive> _bvh_primitive_buffer;
+    Buffer<QBVHNode> _quantized_bvh_node_buffer;
     uint _light_handle_buffer_id{0u};
     uint _tag_lut_buffer_id{0u};
-    float _env_prob;
+    float _env_prob{0.f};
 
     [[nodiscard]] std::pair<Float3, Float3> _world_bounds() const noexcept {
         return std::make_pair(_world_bounds_buffer->read(0u), _world_bounds_buffer->read(1u));
@@ -300,14 +298,9 @@ public:
                 tag_lut[handle.instance_id] = i;
             }
             command_buffer << tag_lut_buffer_view.copy_from(tag_lut.data()) << commit();
-            auto [world_bounds_buffer_view, world_bounds_buffer_id] = pipeline.bindless_arena_buffer<float3>(2u);
-            _world_bounds_buffer = world_bounds_buffer_view;
-            auto [bvh_primitive_buffer_view, bvh_primitive_buffer_id] = pipeline.bindless_arena_buffer<BVHPrimitive>(n);
-            _bvh_primitive_buffer = bvh_primitive_buffer_view;
-            auto [quantized_bvh_node_buffer_view, quantized_bvh_node_buffer_id] = pipeline.bindless_arena_buffer<QBVHNode>(2u * n - 1u);
-            _quantized_bvh_node_buffer = quantized_bvh_node_buffer_view;
-            auto [bvh_leaf_lut_buffer_view, bvh_leaf_lut_buffer_id] = pipeline.bindless_arena_buffer<uint>(n);
-            _bvh_leaf_lut_buffer = bvh_leaf_lut_buffer_view;
+            _world_bounds_buffer = pipeline.device().create_buffer<float3>(2u);
+            _bvh_primitive_buffer = pipeline.device().create_buffer<BVHPrimitive>(n);
+            _quantized_bvh_node_buffer = pipeline.device().create_buffer<QBVHNode>(2u * n - 1u);
             _clear_primitive_data = luisa::make_shared<Shader1D<>>(pipeline.device().compile<1>([&]() noexcept {
                 set_block_size(256u);
                 auto n = static_cast<uint>(pipeline.geometry()->light_instances().size());
@@ -377,8 +370,13 @@ public:
                 };
             }));
         }
-        if (pipeline.environment() != nullptr) {
-            _env_prob = pipeline.lights().empty() ? 1.f : std::clamp(sampler->environment_weight(), 0.01f, 0.99f);
+        if (auto env = pipeline.environment()) {
+            if (pipeline.lights().empty()) {
+                _env_prob = 1.f;
+            } else {
+                _env_prob = std::clamp(
+                    sampler->environment_weight(), 0.01f, 0.99f);
+            }
         }
     }
 
@@ -406,19 +404,20 @@ public:
             world_bounds[0] = bvh->p_min;
             world_bounds[1] = bvh->p_max;
             auto quantized_nodes = encode_quantized_bvh(bvh.get(), world_bounds[0], world_bounds[1]);
-            luisa::vector<uint> leaf_lut(n);
+            if (quantized_nodes.size() < 2u * n - 1u) {
+                quantized_nodes.resize(2u * n - 1u);
+            }
             for (auto i = 0u; i < quantized_nodes.size(); i++) {
                 if (quantized_nodes[i].right_child == 0xffffffffu) {
                     auto first_primitive_offset = quantized_nodes[i].first_primitive_offset;
                     auto last_primitive_offset = first_primitive_offset + quantized_nodes[i].primitive_count;
                     for (auto j = first_primitive_offset; j < last_primitive_offset; j++) {
                         auto tag = primitive_buffer[j].tag;
-                        leaf_lut[tag] = i;
+                        quantized_nodes[tag].lut_entry = i;
                     }
                 }
             }
             command_buffer << _quantized_bvh_node_buffer.copy_from(quantized_nodes.data())
-                           << _bvh_leaf_lut_buffer.copy_from(leaf_lut.data())
                            << _world_bounds_buffer.copy_from(world_bounds.data())
                            << _bvh_primitive_buffer.copy_from(primitive_buffer.data())
                            << commit();
@@ -440,7 +439,7 @@ public:
             } else {
                 auto n = static_cast<uint>(pipeline().geometry()->light_instances().size());
                 $if(tag < n) {
-                    auto current = _bvh_leaf_lut_buffer->read(tag);
+                    auto current = _quantized_bvh_node_buffer->read(tag).lut_entry;
                     auto current_node = _quantized_bvh_node_buffer->read(current);
                     auto [world_min, world_max] = _world_bounds();
                     prob = (1.f - _env_prob);
