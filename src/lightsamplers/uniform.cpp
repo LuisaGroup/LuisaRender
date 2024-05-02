@@ -32,7 +32,7 @@ public:
     UniformLightSamplerInstance(const UniformLightSampler *sampler, Pipeline &pipeline, CommandBuffer &command_buffer) noexcept
         : LightSampler::Instance{pipeline, sampler} {
         if (!pipeline.lights().empty()) {
-            auto [view, buffer_id] = pipeline.bindless_arena_buffer<Light::Handle>(pipeline.lights().size());
+            auto [view, buffer_id] = pipeline.bindless_arena_buffer<Light::Handle>(pipeline.geometry()->light_instances().size());
             _light_buffer_id = buffer_id;
             command_buffer << view.copy_from(pipeline.geometry()->light_instances().data())
                            << compute::commit();
@@ -61,7 +61,7 @@ public:
                 LUISA_WARNING_WITH_LOCATION("No lights in scene.");
                 prob = 0.f;
             } else {
-                auto n = static_cast<float>(pipeline().lights().size());
+                auto n = static_cast<float>(pipeline().geometry()->light_instances().size());
                 prob = (1.f - _env_prob) / n;
             }
         };
@@ -80,7 +80,7 @@ public:
             auto closure = light->closure(swl, time);
             eval = closure->evaluate(it, p_from);
         });
-        auto n = static_cast<float>(pipeline().lights().size());
+        auto n = static_cast<float>(pipeline().geometry()->light_instances().size());
         eval.pdf *= (1.f - _env_prob) / n;
         return eval;
     }
@@ -100,7 +100,7 @@ public:
         const Interaction &it_from, Expr<float> u,
         const SampledWavelengths &swl, Expr<float> time) const noexcept override {
         LUISA_ASSERT(pipeline().has_lighting(), "No lights in scene.");
-        auto n = static_cast<float>(pipeline().lights().size());
+        auto n = static_cast<float>(pipeline().geometry()->light_instances().size());
         if (_env_prob == 1.f) { return {.tag = LightSampler::selection_environment, .prob = 1.f}; }
         if (_env_prob == 0.f) { return {.tag = cast<uint>(clamp(u * n, 0.f, n - 1.f)), .prob = 1.f / n}; }
         auto uu = (u - _env_prob) / (1.f - _env_prob);
@@ -113,7 +113,7 @@ public:
         Expr<float> u,
         const SampledWavelengths &swl, Expr<float> time) const noexcept override {
         LUISA_ASSERT(pipeline().has_lighting(), "No lights in scene.");
-        auto n = static_cast<float>(pipeline().lights().size());
+        auto n = static_cast<float>(pipeline().geometry()->light_instances().size());
         if (_env_prob == 1.f) { return {.tag = LightSampler::selection_environment, .prob = 1.f}; }
         if (_env_prob == 0.f) { return {.tag = cast<uint>(clamp(u * n, 0.f, n - 1.f)), .prob = 1.f / n}; }
         auto uu = (u - _env_prob) / (1.f - _env_prob);

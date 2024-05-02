@@ -27,15 +27,16 @@ public:
 class PowerLightSamplerInstance final : public LightSampler::Instance {
 
 private:
-    luisa::unique_ptr<Shader1D<uint>> _clear_light_power;
-    luisa::unique_ptr<Shader1D<uint, float>> _compute_light_power;
+    luisa::shared_ptr<Buffer<AliasEntry>> _alias_table_buffer;
+    luisa::shared_ptr<Buffer<float>> _pdf_buffer;
+    luisa::shared_ptr<Shader1D<uint>> _clear_light_power;
+    luisa::shared_ptr<Shader1D<uint, float>> _compute_light_power;
     uint _light_handle_buffer_id{0u};
     uint _tag_lut_buffer_id{0u};
-    uint _alias_table_buffer_id{0u};
-    uint _pdf_buffer_id{0u};
-    BufferView<AliasEntry> _alias_table_buffer_view;
-    BufferView<float> _pdf_buffer_view;
     float _env_prob{0.f};
+
+    [[nodiscard]] BufferView<AliasEntry> alias_table_buffer() const noexcept { return *_alias_table_buffer; }
+    [[nodiscard]] BufferView<float> pdf_buffer() const noexcept { return *_pdf_buffer; }
 
 public:
     PowerLightSamplerInstance(const PowerLightSampler *sampler, Pipeline &pipeline, CommandBuffer &command_buffer) noexcept
@@ -47,12 +48,8 @@ public:
             _light_handle_buffer_id = light_handle_buffer_id;
             auto [tag_lut_buffer_view, tag_lut_buffer_id] = pipeline.bindless_arena_buffer<uint>(num_inst);
             _tag_lut_buffer_id = tag_lut_buffer_id;
-            auto [alias_table_buffer_view, alias_table_buffer_id] = pipeline.bindless_arena_buffer<AliasEntry>(num_light_inst);
-            _alias_table_buffer_id = alias_table_buffer_id;
-            _alias_table_buffer_view = alias_table_buffer_view;
-            auto [pdf_buffer_view, pdf_buffer_id] = pipeline.bindless_arena_buffer<float>(num_light_inst);
-            _pdf_buffer_id = pdf_buffer_id;
-            _pdf_buffer_view = pdf_buffer_view;
+            _alias_table_buffer = luisa::make_shared<Buffer<AliasEntry>>(pipeline.device().create_buffer<AliasEntry>(num_light_inst));
+            _pdf_buffer = luisa::make_shared<Buffer<float>>(pipeline.device().create_buffer<float>(num_light_inst));
             command_buffer << light_handle_buffer_view.copy_from(pipeline.geometry()->light_instances().data()) << commit();
             luisa::vector<uint> tag_lut(num_inst);
             for (auto i = 0u; i < num_light_inst; i++) {
@@ -60,15 +57,15 @@ public:
                 tag_lut[handle.instance_id] = i;
             }
             command_buffer << tag_lut_buffer_view.copy_from(tag_lut.data()) << commit();
-            _clear_light_power = luisa::make_unique<Shader1D<uint>>(pipeline.device().compile<1>([&](UInt num_light_inst) noexcept {
+            _clear_light_power = luisa::make_shared<Shader1D<uint>>(pipeline.device().compile<1>([&](UInt num_light_inst) noexcept {
                 set_block_size(256u);
                 auto i = dispatch_id().x;
                 $while(i < num_light_inst) {
-                    _pdf_buffer_view->write(i, 0.f);
+                    pdf_buffer()->write(i, 0.f);
                     i += dispatch_size().x;
                 };
             }));
-            _compute_light_power = luisa::make_unique<Shader1D<uint, float>>(pipeline.device().compile<1>([&](UInt num_light_inst, Float time) noexcept {
+            _compute_light_power = luisa::make_shared<Shader1D<uint, float>>(pipeline.device().compile<1>([&](UInt num_light_inst, Float time) noexcept {
                 set_block_size(256u);
                 auto instance_id = def(0u);
                 $while(instance_id < num_light_inst) {
@@ -99,7 +96,7 @@ public:
                         power += emission_luminance * surface_area;
                         primitive_id += dispatch_size().x;
                     };
-                    _pdf_buffer_view->atomic(instance_id).fetch_add(power);
+                    pdf_buffer()->atomic(instance_id).fetch_add(power);
                     instance_id += 1u;
                 };
             }));
@@ -116,12 +113,12 @@ public:
             luisa::vector<float> power_table(num_light_inst);
             command_buffer << (*_clear_light_power)(num_light_inst).dispatch(1024u)
                            << (*_compute_light_power)(num_light_inst, time).dispatch(1024u)
-                           << _pdf_buffer_view.copy_to(power_table.data())
+                           << pdf_buffer().copy_to(power_table.data())
                            << commit();
             command_buffer << synchronize();
             auto [alias_table, pdf] = create_alias_table(power_table);
-            command_buffer << _alias_table_buffer_view.copy_from(alias_table.data())
-                           << _pdf_buffer_view.copy_from(pdf.data())
+            command_buffer << alias_table_buffer().copy_from(alias_table.data())
+                           << pdf_buffer().copy_from(pdf.data())
                            << commit();
         }
     }
@@ -137,7 +134,7 @@ public:
                 LUISA_WARNING_WITH_LOCATION("No lights in scene.");
                 prob = 0.f;
             } else {
-                prob = (1.f - _env_prob) * _pdf_buffer_view->read(tag);
+                prob = (1.f - _env_prob) * pdf_buffer()->read(tag);
             }
         };
         return prob;
@@ -178,8 +175,8 @@ public:
         auto n = static_cast<float>(pipeline().geometry()->light_instances().size());
         if (_env_prob == 1.f) { return {.tag = LightSampler::selection_environment, .prob = 1.f}; }
         auto uu = (u - _env_prob) / (1.f - _env_prob);
-        auto [tag, _] = sample_alias_table(_alias_table_buffer_view, static_cast<uint>(n), uu);
-        auto prob = _pdf_buffer_view->read(tag);
+        auto [tag, _] = sample_alias_table(alias_table_buffer(), static_cast<uint>(n), uu);
+        auto prob = pdf_buffer()->read(tag);
         auto is_env = u < _env_prob;
         return {.tag = ite(is_env, LightSampler::selection_environment, tag),
                 .prob = ite(is_env, _env_prob, (1.f - _env_prob) * prob)};
@@ -192,8 +189,8 @@ public:
         auto n = static_cast<float>(pipeline().geometry()->light_instances().size());
         if (_env_prob == 1.f) { return {.tag = LightSampler::selection_environment, .prob = 1.f}; }
         auto uu = (u - _env_prob) / (1.f - _env_prob);
-        auto [tag, _] = sample_alias_table(_alias_table_buffer_view, static_cast<uint>(n), uu);
-        auto prob = _pdf_buffer_view->read(tag);
+        auto [tag, _] = sample_alias_table(alias_table_buffer(), static_cast<uint>(n), uu);
+        auto prob = pdf_buffer()->read(tag);
         auto is_env = u < _env_prob;
         return {.tag = ite(is_env, LightSampler::selection_environment, tag),
                 .prob = ite(is_env, _env_prob, (1.f - _env_prob) * prob)};
