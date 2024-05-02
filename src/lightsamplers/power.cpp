@@ -27,10 +27,10 @@ public:
 class PowerLightSamplerInstance final : public LightSampler::Instance {
 
 private:
-    BufferView<AliasEntry> _alias_table_buffer;
-    BufferView<float> _pdf_buffer;
     luisa::shared_ptr<Shader1D<uint>> _clear_light_power;
     luisa::shared_ptr<Shader1D<uint, float>> _compute_light_power;
+    Buffer<AliasEntry> _alias_table_buffer;
+    Buffer<float> _pdf_buffer;
     uint _light_handle_buffer_id{0u};
     uint _tag_lut_buffer_id{0u};
     float _env_prob{0.f};
@@ -45,10 +45,8 @@ public:
             _light_handle_buffer_id = light_handle_buffer_id;
             auto [tag_lut_buffer_view, tag_lut_buffer_id] = pipeline.bindless_arena_buffer<uint>(num_inst);
             _tag_lut_buffer_id = tag_lut_buffer_id;
-            auto [alias_table_buffer_view, alias_table_buffer_id] = pipeline.bindless_arena_buffer<AliasEntry>(num_light_inst);
-            _alias_table_buffer = alias_table_buffer_view;
-            auto [pdf_buffer_view, pdf_buffer_id] = pipeline.bindless_arena_buffer<float>(num_light_inst);
-            _pdf_buffer = pdf_buffer_view;
+            _alias_table_buffer = pipeline.device().create_buffer<AliasEntry>(num_light_inst);
+            _pdf_buffer = pipeline.device().create_buffer<float>(num_light_inst);
             command_buffer << light_handle_buffer_view.copy_from(pipeline.geometry()->light_instances().data()) << commit();
             luisa::vector<uint> tag_lut(num_inst);
             for (auto i = 0u; i < num_light_inst; i++) {
