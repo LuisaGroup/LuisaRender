@@ -210,13 +210,13 @@ namespace luisa::render {
             auto [node, parent_index] = stack.top();
             stack.pop();
             auto current_index = static_cast<uint>(quantized_nodes.size());
+            quantized_nodes.push_back(QBVHNode::encode(*node, world_min, world_max));
             if (parent_index != 0xffffffffu) {
-                quantized_nodes[parent_index].parent = current_index;
+                quantized_nodes[current_index].parent = parent_index;
                 if (current_index != parent_index + 1u) {
                     quantized_nodes[parent_index].right_child = current_index;
                 }
             }
-            quantized_nodes.push_back(QBVHNode::encode(*node, world_min, world_max));
             if (!node->is_leaf()) {
                 stack.push({node->right_child(), current_index});
                 stack.push({node->left_child(), current_index}); /* left child is traversed right after the current node, hence no need to store left child's index */
@@ -252,16 +252,16 @@ class BVHLightSamplerInstance final : public LightSampler::Instance {
 private:
     luisa::shared_ptr<Shader1D<>> _clear_primitive_data;
     luisa::shared_ptr<Shader1D<float>> _update_primitive_data;
-    luisa::shared_ptr<Buffer<float3>> _world_bounds_buffer;
-    luisa::shared_ptr<Buffer<BVHPrimitive>> _bvh_primitive_buffer;
-    luisa::shared_ptr<Buffer<QBVHNode>> _quantized_bvh_node_buffer;
-    luisa::shared_ptr<Buffer<uint>> _bvh_leaf_lut_buffer;
+    BufferView<float3> _world_bounds_buffer;
+    BufferView<BVHPrimitive> _bvh_primitive_buffer;
+    BufferView<QBVHNode> _quantized_bvh_node_buffer;
+    BufferView<uint> _bvh_leaf_lut_buffer;
     uint _light_handle_buffer_id{0u};
     uint _tag_lut_buffer_id{0u};
     float _env_prob;
 
     [[nodiscard]] std::pair<Float3, Float3> _world_bounds() const noexcept {
-        return std::make_pair((*_world_bounds_buffer)->read(0u), (*_world_bounds_buffer)->read(1u));
+        return std::make_pair(_world_bounds_buffer->read(0u), _world_bounds_buffer->read(1u));
     }
     [[nodiscard]] static Float _evaluate_node(Expr<QBVHNode> node, Expr<float3> p_from, Expr<float3> world_min, Expr<float3> world_max) noexcept {
         auto constexpr QUANTIZED_COORDINATE_BITS = 10u;
@@ -300,10 +300,14 @@ public:
                 tag_lut[handle.instance_id] = i;
             }
             command_buffer << tag_lut_buffer_view.copy_from(tag_lut.data()) << commit();
-            _world_bounds_buffer = luisa::make_shared<Buffer<float3>>(pipeline.device().create_buffer<float3>(2u));
-            _bvh_primitive_buffer = luisa::make_shared<Buffer<BVHPrimitive>>(pipeline.device().create_buffer<BVHPrimitive>(n));
-            _quantized_bvh_node_buffer = luisa::make_shared<Buffer<QBVHNode>>(pipeline.device().create_buffer<QBVHNode>(2u * n - 1u));
-            _bvh_leaf_lut_buffer = luisa::make_shared<Buffer<uint>>(pipeline.device().create_buffer<uint>(n));
+            auto [world_bounds_buffer_view, world_bounds_buffer_id] = pipeline.bindless_arena_buffer<float3>(2u);
+            _world_bounds_buffer = world_bounds_buffer_view;
+            auto [bvh_primitive_buffer_view, bvh_primitive_buffer_id] = pipeline.bindless_arena_buffer<BVHPrimitive>(n);
+            _bvh_primitive_buffer = bvh_primitive_buffer_view;
+            auto [quantized_bvh_node_buffer_view, quantized_bvh_node_buffer_id] = pipeline.bindless_arena_buffer<QBVHNode>(2u * n - 1u);
+            _quantized_bvh_node_buffer = quantized_bvh_node_buffer_view;
+            auto [bvh_leaf_lut_buffer_view, bvh_leaf_lut_buffer_id] = pipeline.bindless_arena_buffer<uint>(n);
+            _bvh_leaf_lut_buffer = bvh_leaf_lut_buffer_view;
             _clear_primitive_data = luisa::make_shared<Shader1D<>>(pipeline.device().compile<1>([&]() noexcept {
                 set_block_size(256u);
                 auto n = static_cast<uint>(pipeline.geometry()->light_instances().size());
@@ -318,7 +322,7 @@ public:
                 primitive.power = 0.f;
                 primitive.tag = 0xffffffffu;
                 $while(i < n) {
-                    (*_bvh_primitive_buffer)->write(i, primitive);
+                    _bvh_primitive_buffer->write(i, primitive);
                     i += dispatch_size().x;
                 };
             }));
@@ -362,13 +366,13 @@ public:
                         power += surface_area * emission_luminance;
                         primitive_id += dispatch_size().x;
                     };
-                    (*_bvh_primitive_buffer)->atomic(tag).x_min.fetch_min(p_min.x);
-                    (*_bvh_primitive_buffer)->atomic(tag).y_min.fetch_min(p_min.y);
-                    (*_bvh_primitive_buffer)->atomic(tag).z_min.fetch_min(p_min.z);
-                    (*_bvh_primitive_buffer)->atomic(tag).x_max.fetch_max(p_max.x);
-                    (*_bvh_primitive_buffer)->atomic(tag).y_max.fetch_max(p_max.y);
-                    (*_bvh_primitive_buffer)->atomic(tag).z_max.fetch_max(p_max.z);
-                    (*_bvh_primitive_buffer)->atomic(tag).power.fetch_add(power);
+                    _bvh_primitive_buffer->atomic(tag).x_min.fetch_min(p_min.x);
+                    _bvh_primitive_buffer->atomic(tag).y_min.fetch_min(p_min.y);
+                    _bvh_primitive_buffer->atomic(tag).z_min.fetch_min(p_min.z);
+                    _bvh_primitive_buffer->atomic(tag).x_max.fetch_max(p_max.x);
+                    _bvh_primitive_buffer->atomic(tag).y_max.fetch_max(p_max.y);
+                    _bvh_primitive_buffer->atomic(tag).z_max.fetch_max(p_max.z);
+                    _bvh_primitive_buffer->atomic(tag).power.fetch_add(power);
                     tag += 1u;
                 };
             }));
@@ -387,7 +391,7 @@ public:
             luisa::vector<BVHPrimitive> primitive_buffer(n);
             command_buffer << (*_clear_primitive_data)().dispatch(1024u)
                            << (*_update_primitive_data)(time).dispatch(1024u)
-                           << _bvh_primitive_buffer->copy_to(primitive_buffer.data())
+                           << _bvh_primitive_buffer.copy_to(primitive_buffer.data())
                            << commit()
                            << synchronize();
             luisa::list<BVHPrimitive> primitive_list;
@@ -413,10 +417,10 @@ public:
                     }
                 }
             }
-            command_buffer << _quantized_bvh_node_buffer->copy_from(quantized_nodes.data())
-                           << _bvh_leaf_lut_buffer->copy_from(leaf_lut.data())
-                           << _world_bounds_buffer->copy_from(world_bounds.data())
-                           << _bvh_primitive_buffer->copy_from(primitive_buffer.data())
+            command_buffer << _quantized_bvh_node_buffer.copy_from(quantized_nodes.data())
+                           << _bvh_leaf_lut_buffer.copy_from(leaf_lut.data())
+                           << _world_bounds_buffer.copy_from(world_bounds.data())
+                           << _bvh_primitive_buffer.copy_from(primitive_buffer.data())
                            << commit();
             command_buffer << synchronize();
             LUISA_INFO("BVH updated in {} ms.", clk.toc());
@@ -434,32 +438,37 @@ public:
                 LUISA_WARNING_WITH_LOCATION("No lights in scene.");
                 prob = 0.f;
             } else {
-                auto current = (*_bvh_leaf_lut_buffer)->read(tag);
-                auto current_node = (*_quantized_bvh_node_buffer)->read(current);
-                auto [world_min, world_max] = _world_bounds();
-                prob = (1.f - _env_prob);
-                auto first_primitive_offset = current_node.first_primitive_offset;
-                auto last_primitive_offset = first_primitive_offset + current_node.primitive_count;
-                auto w1 = def(0.f), w_sum = def(0.f);
-                $for(primitive_id, first_primitive_offset, last_primitive_offset) {
-                    auto primitive = (*_bvh_primitive_buffer)->read(primitive_id);
-                    auto w = _evaluate_primitive(primitive, p_from);
-                    $if(primitive.tag == tag) {
-                        w1 = w;
+                auto n = static_cast<uint>(pipeline().geometry()->light_instances().size());
+                $if(tag < n) {
+                    auto current = _bvh_leaf_lut_buffer->read(tag);
+                    auto current_node = _quantized_bvh_node_buffer->read(current);
+                    auto [world_min, world_max] = _world_bounds();
+                    prob = (1.f - _env_prob);
+                    auto first_primitive_offset = current_node.first_primitive_offset;
+                    auto last_primitive_offset = first_primitive_offset + current_node.primitive_count;
+                    auto w1 = def(0.f), w_sum = def(0.f);
+                    $for(primitive_id, first_primitive_offset, last_primitive_offset) {
+                        auto primitive = _bvh_primitive_buffer->read(primitive_id);
+                        auto w = _evaluate_primitive(primitive, p_from);
+                        $if(primitive.tag == tag) {
+                            w1 = w;
+                        };
+                        w_sum += w;
                     };
-                    w_sum += w;
-                };
-                prob *= w1 / w_sum;
-                $while(current_node.parent != 0xffffffffu) {
-                    auto parent = current_node.parent;
-                    auto parent_node = (*_quantized_bvh_node_buffer)->read(parent);
-                    auto sibling = ite(parent_node.right_child == current, parent + 1u, parent_node.right_child);
-                    auto sibling_node = (*_quantized_bvh_node_buffer)->read(sibling);
-                    auto w1 = _evaluate_node(current_node, p_from, world_min, world_max);
-                    auto w2 = _evaluate_node(sibling_node, p_from, world_min, world_max);
-                    prob *= w1 / (w1 + w2);
-                    current = parent;
-                    current_node = parent_node;
+                    prob *= w1 / w_sum;
+                    $while(current_node.parent != 0xffffffffu) {
+                        auto parent = current_node.parent;
+                        auto parent_node = _quantized_bvh_node_buffer->read(parent);
+                        auto sibling = ite(parent_node.right_child == current, parent + 1u, parent_node.right_child);
+                        auto sibling_node = _quantized_bvh_node_buffer->read(sibling);
+                        auto w1 = _evaluate_node(current_node, p_from, world_min, world_max);
+                        auto w2 = _evaluate_node(sibling_node, p_from, world_min, world_max);
+                        prob *= w1 / (w1 + w2);
+                        current = parent;
+                        current_node = parent_node;
+                    };
+                } $else {
+                    prob = 0.f;
                 };
             }
         };
@@ -501,11 +510,11 @@ public:
         auto uu = (u - _env_prob) / (1.f - _env_prob);
         auto [world_min, world_max] = _world_bounds();
         auto current = def(0u);
-        auto current_node = (*_quantized_bvh_node_buffer)->read(current);
+        auto current_node = _quantized_bvh_node_buffer->read(current);
         auto prob = def(1.f - _env_prob);
         $while(current_node.right_child != 0xffffffffu) {
-            auto left_child = (*_quantized_bvh_node_buffer)->read(current + 1u);
-            auto right_child = (*_quantized_bvh_node_buffer)->read(current_node.right_child);
+            auto left_child = _quantized_bvh_node_buffer->read(current + 1u);
+            auto right_child = _quantized_bvh_node_buffer->read(current_node.right_child);
             auto w1 = _evaluate_node(left_child, it_from.p(), world_min, world_max);
             auto w2 = _evaluate_node(right_child, it_from.p(), world_min, world_max);
             auto left_prob = w1 / (w1 + w2);
@@ -526,7 +535,7 @@ public:
         auto selected_primitive_id = first_primitive_offset;
         auto w1 = def(0.f), w_sum = def(0.f);
         $for(primitive_id, first_primitive_offset, last_primitive_offset) {
-            auto primitive = (*_bvh_primitive_buffer)->read(primitive_id);
+            auto primitive = _bvh_primitive_buffer->read(primitive_id);
             auto w = _evaluate_primitive(primitive, it_from.p());
             w_sum += w;
             auto p = w / w_sum;
@@ -534,9 +543,11 @@ public:
                 w1 = w;
                 selected_primitive_id = primitive_id;
                 uu /= p;
+            } $else {
+                uu = (uu - p) / (1.f - p);
             };
         };
-        auto tag = (*_bvh_primitive_buffer)->read(selected_primitive_id).tag;
+        auto tag = _bvh_primitive_buffer->read(selected_primitive_id).tag;
         prob *= w1 / w_sum;
         auto is_env = u < _env_prob;
         return {.tag = ite(is_env, LightSampler::selection_environment, tag),
