@@ -123,9 +123,8 @@ for i in range(500):
     #loss = loss_func(render_img,target_img)
     loss = torch.sum((render_img[400:,...]-target_img[400:,...])**2)
     loss.backward()
-    grad = render_img.grad[...,:3]
-    #print("debug pixel", render_img[458, 210,:3], grad[458, 210,:3])
-    #exit()
+    grad = torch.cat([render_img.grad[...,:3],torch.zeros_like(render_img.grad[...,:2])],dim=-1)
+    print(grad.shape)
     aux_buffer = luisarender.render_backward([grad.contiguous().data_ptr()],[np.prod(grad.shape)])
     aux_buffer_torch = cu_device_ptr_to_torch_tensor(aux_buffer[0],  (512, 512, 4), dtype=cupy.float32)
     aux_buffer_numpy = aux_buffer_torch.cpu().numpy()
@@ -137,7 +136,6 @@ for i in range(500):
     print(mx, np.max(graddis_avg), np.min(graddis_avg))
     grad_reldis_vis = cm(graddis_avg/mx)
     imageio.imwrite(f"outputs/grad_vis_{i}.png",grad_reldis_vis)
-
     exit()
 
     tex_grad, geom_grad = luisarender.get_gradients()

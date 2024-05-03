@@ -87,10 +87,8 @@ luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, con
     }
     update_bindless_if_dirty();
 
-
+    LUISA_INFO_WITH_LOCATION("start integrator build.");
     pipeline->_integrator = scene.integrator()->build(*pipeline, command_buffer);
-
-    
     LUISA_INFO_WITH_LOCATION("start _differentiation build.");
     if (auto &&diff = pipeline->_differentiation) {
         diff->register_optimizer(dynamic_cast<DifferentiableIntegrator::Instance *>(pipeline->_integrator.get())->optimizer());
