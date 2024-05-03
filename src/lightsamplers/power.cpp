@@ -27,8 +27,7 @@ public:
 class PowerLightSamplerInstance final : public LightSampler::Instance {
 
 private:
-    luisa::shared_ptr<Shader1D<uint>> _clear_light_power;
-    luisa::shared_ptr<Shader1D<uint, float>> _compute_light_power;
+    luisa::shared_ptr<Shader1D<float>> _compute_light_power;
     Buffer<AliasEntry> _alias_table_buffer;
     Buffer<float> _pdf_buffer;
     uint _light_handle_buffer_id{0u};
@@ -39,42 +38,34 @@ public:
     PowerLightSamplerInstance(const PowerLightSampler *sampler, Pipeline &pipeline, CommandBuffer &command_buffer) noexcept
         : LightSampler::Instance{pipeline, sampler} {
         if (!pipeline.lights().empty()) {
-            auto num_inst = static_cast<uint>(pipeline.geometry()->instances().size());
-            auto num_light_inst = static_cast<uint>(pipeline.geometry()->light_instances().size());
-            auto [light_handle_buffer_view, light_handle_buffer_id] = pipeline.bindless_arena_buffer<Light::Handle>(num_light_inst);
+            auto m = static_cast<uint>(pipeline.geometry()->instances().size());
+            auto n = static_cast<uint>(pipeline.geometry()->light_instances().size());
+            auto [light_handle_buffer_view, light_handle_buffer_id] = pipeline.bindless_arena_buffer<Light::Handle>(n);
             _light_handle_buffer_id = light_handle_buffer_id;
-            auto [tag_lut_buffer_view, tag_lut_buffer_id] = pipeline.bindless_arena_buffer<uint>(num_inst);
+            auto [tag_lut_buffer_view, tag_lut_buffer_id] = pipeline.bindless_arena_buffer<uint>(m);
             _tag_lut_buffer_id = tag_lut_buffer_id;
-            _alias_table_buffer = pipeline.device().create_buffer<AliasEntry>(num_light_inst);
-            _pdf_buffer = pipeline.device().create_buffer<float>(num_light_inst);
+            _alias_table_buffer = pipeline.device().create_buffer<AliasEntry>(n);
+            _pdf_buffer = pipeline.device().create_buffer<float>(n);
             command_buffer << light_handle_buffer_view.copy_from(pipeline.geometry()->light_instances().data()) << commit();
-            luisa::vector<uint> tag_lut(num_inst);
-            for (auto i = 0u; i < num_light_inst; i++) {
+            luisa::vector<uint> tag_lut(m);
+            for (auto i = 0u; i < n; i++) {
                 auto const &handle = pipeline.geometry()->light_instances()[i];
                 tag_lut[handle.instance_id] = i;
             }
             command_buffer << tag_lut_buffer_view.copy_from(tag_lut.data()) << commit();
-            _clear_light_power = luisa::make_shared<Shader1D<uint>>(pipeline.device().compile<1>([&](UInt num_light_inst) noexcept {
+            _compute_light_power = luisa::make_shared<Shader1D<float>>(pipeline.device().compile<1>([&](Float time) noexcept {
                 set_block_size(256u);
-                auto i = dispatch_id().x;
-                $while(i < num_light_inst) {
-                    _pdf_buffer->write(i, 0.f);
-                    i += dispatch_size().x;
-                };
-            }));
-            _compute_light_power = luisa::make_shared<Shader1D<uint, float>>(pipeline.device().compile<1>([&](UInt num_light_inst, Float time) noexcept {
-                set_block_size(256u);
-                auto instance_id = def(0u);
-                $while(instance_id < num_light_inst) {
+                auto instance_id = dispatch_id().x;
+                auto n = static_cast<uint>(pipeline.geometry()->light_instances().size());
+                $while(instance_id < n) {
                     auto power = def(0.f);
                     auto handle = pipeline.buffer<Light::Handle>(_light_handle_buffer_id).read(instance_id);
                     auto light_inst = pipeline.geometry()->instance(handle.instance_id);
                     auto object_to_world = pipeline.geometry()->instance_to_world(handle.instance_id);
                     auto m = make_float3x3(object_to_world);
-                    auto primitive_id = dispatch_id().x;
-                    $while(primitive_id < light_inst.triangle_count()) {
+                    auto v_buffer = light_inst.vertex_buffer_id();
+                    $for(primitive_id, 0u, light_inst.triangle_count()) {
                         auto triangle = pipeline.geometry()->triangle(light_inst, primitive_id);
-                        auto v_buffer = light_inst.vertex_buffer_id();
                         auto v0 = pipeline.buffer<Vertex>(v_buffer).read(triangle.i0);
                         auto v1 = pipeline.buffer<Vertex>(v_buffer).read(triangle.i1);
                         auto v2 = pipeline.buffer<Vertex>(v_buffer).read(triangle.i2);
@@ -91,10 +82,9 @@ public:
                             emission_luminance += closure->evaluate_luminance(Interaction(gravity_center_uv)) / 3.f;
                         });
                         power += emission_luminance * surface_area;
-                        primitive_id += dispatch_size().x;
                     };
-                    _pdf_buffer->atomic(instance_id).fetch_add(power);
-                    instance_id += 1u;
+                    _pdf_buffer->write(instance_id, power);
+                    instance_id += dispatch_size().x;
                 };
             }));
             command_buffer << synchronize();
@@ -106,17 +96,17 @@ public:
 
     void update(CommandBuffer &command_buffer, float time) noexcept override {
         if (!pipeline().lights().empty()) {
-            auto num_light_inst = static_cast<uint>(pipeline().geometry()->light_instances().size());
-            luisa::vector<float> power_table(num_light_inst);
-            command_buffer << (*_clear_light_power)(num_light_inst).dispatch(1024u)
-                           << (*_compute_light_power)(num_light_inst, time).dispatch(1024u)
+            auto n = static_cast<uint>(pipeline().geometry()->light_instances().size());
+            luisa::vector<float> power_table(n);
+            command_buffer << (*_compute_light_power)(time).dispatch(1024u)
                            << _pdf_buffer.copy_to(power_table.data())
                            << commit();
             command_buffer << synchronize();
             auto [alias_table, pdf] = create_alias_table(power_table);
             command_buffer << _alias_table_buffer.copy_from(alias_table.data())
                            << _pdf_buffer.copy_from(pdf.data())
-                           << commit();
+                           << commit()
+                           << synchronize();
         }
     }
 
@@ -126,7 +116,8 @@ public:
         auto prob = def(0.f);
         $if(tag == LightSampler::selection_environment) {
             prob = _env_prob;
-        } $else {
+        }
+        $else {
             if (pipeline().lights().empty()) [[unlikely]] {// no lights
                 LUISA_WARNING_WITH_LOCATION("No lights in scene.");
                 prob = 0.f;
@@ -134,7 +125,8 @@ public:
                 auto n = static_cast<uint>(pipeline().geometry()->light_instances().size());
                 $if(tag >= n) {
                     prob = 0.f;
-                } $else {
+                }
+                $else {
                     prob = (1.f - _env_prob) * _pdf_buffer->read(tag);
                 };
             }
@@ -143,8 +135,8 @@ public:
     }
 
     [[nodiscard]] Light::Evaluation evaluate_hit(
-    const Interaction &it, Expr<float3> p_from,
-    const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+        const Interaction &it, Expr<float3> p_from,
+        const SampledWavelengths &swl, Expr<float> time) const noexcept override {
         auto eval = Light::Evaluation::zero(swl.dimension());
         if (pipeline().lights().empty()) [[unlikely]] {// no lights
             LUISA_WARNING_WITH_LOCATION("No lights in scene.");
@@ -160,7 +152,7 @@ public:
     }
 
     [[nodiscard]] Light::Evaluation evaluate_miss(
-    Expr<float3> wi, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+        Expr<float3> wi, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
         if (_env_prob == 0.f) [[unlikely]] {// no environment
             LUISA_WARNING_WITH_LOCATION("No environment in scene");
             return {.L = SampledSpectrum{swl.dimension()}, .pdf = 0.f};
@@ -171,8 +163,8 @@ public:
     }
 
     [[nodiscard]] LightSampler::Selection select(
-    const Interaction &it_from, Expr<float> u,
-    const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+        const Interaction &it_from, Expr<float> u,
+        const SampledWavelengths &swl, Expr<float> time) const noexcept override {
         LUISA_ASSERT(pipeline().has_lighting(), "No lights in scene.");
         auto n = static_cast<float>(pipeline().geometry()->light_instances().size());
         if (_env_prob == 1.f) { return {.tag = LightSampler::selection_environment, .prob = 1.f}; }
@@ -185,8 +177,8 @@ public:
     }
 
     [[nodiscard]] LightSampler::Selection select(
-    Expr<float> u,
-    const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+        Expr<float> u,
+        const SampledWavelengths &swl, Expr<float> time) const noexcept override {
         LUISA_ASSERT(pipeline().has_lighting(), "No lights in scene.");
         auto n = static_cast<float>(pipeline().geometry()->light_instances().size());
         if (_env_prob == 1.f) { return {.tag = LightSampler::selection_environment, .prob = 1.f}; }
@@ -263,6 +255,6 @@ unique_ptr<LightSampler::Instance> PowerLightSampler::build(
         this, pipeline, command_buffer);
 }
 
-} // namespace luisa::render
+}// namespace luisa::render
 
 LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::PowerLightSampler)
