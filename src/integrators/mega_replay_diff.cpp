@@ -216,7 +216,7 @@ void MegakernelReplayDiffInstance::_render_one_camera_backward(
 
 #ifdef LUISA_RENDER_PATH_REPLAY_DEBUG
             $if(all(pixel_id == pixel_checked)) {
-                pipeline().printer().info("Li_1spp forward: Li = ({}, {}, {})", Li[0u], Li[1u], Li[2u]);
+                pipeline().device_log("Li_1spp forward: Li = ({}, {}, {})", Li[0u], Li[1u], Li[2u]);
             };
 #endif
 
@@ -236,7 +236,7 @@ void MegakernelReplayDiffInstance::_render_one_camera_backward(
 
 #ifdef LUISA_RENDER_PATH_REPLAY_DEBUG
                         $if(all(pixel_id == pixel_checked)) {
-                            pipeline().printer().info("miss and break: Li = ({}, {}, {})", Li[0u], Li[1u], Li[2u]);
+                            pipeline().device_log("miss and break: Li = ({}, {}, {})", Li[0u], Li[1u], Li[2u]);
                         };
 #endif
                     }
@@ -251,7 +251,7 @@ void MegakernelReplayDiffInstance::_render_one_camera_backward(
 
 #ifdef LUISA_RENDER_PATH_REPLAY_DEBUG
                         $if(all(pixel_id == pixel_checked)) {
-                            pipeline().printer().info("hit light: Li = ({}, {}, {})", Li[0u], Li[1u], Li[2u]);
+                            pipeline().device_log("hit light: Li = ({}, {}, {})", Li[0u], Li[1u], Li[2u]);
                         };
 #endif
                     };
@@ -314,7 +314,7 @@ void MegakernelReplayDiffInstance::_render_one_camera_backward(
 
 #ifdef LUISA_RENDER_PATH_REPLAY_DEBUG
                                 $if(all(pixel_id == pixel_checked)) {
-                                    pipeline().printer().info("direct lighted: Li = ({}, {}, {})", Li[0u], Li[1u], Li[2u]);
+                                    pipeline().device_log("direct lighted: Li = ({}, {}, {})", Li[0u], Li[1u], Li[2u]);
                                 };
 #endif
                             };
@@ -349,7 +349,7 @@ void MegakernelReplayDiffInstance::_render_one_camera_backward(
 
 #ifdef LUISA_RENDER_PATH_REPLAY_DEBUG
             $if(all(pixel_id == pixel_checked)) {
-                pipeline().printer().info("done: Li = ({}, {}, {})", Li[0u], Li[1u], Li[2u]);
+                pipeline().device_log("done: Li = ({}, {}, {})", Li[0u], Li[1u], Li[2u]);
             };
 #endif
         };
@@ -407,7 +407,7 @@ void MegakernelReplayDiffInstance::_render_one_camera_backward(
 
 #ifdef LUISA_RENDER_PATH_REPLAY_DEBUG
             $if(all(pixel_id == pixel_checked)) {
-                pipeline().printer().info("Li_1spp backward start: Li = ({}, {}, {})", Li[0u], Li[1u], Li[2u]);
+                pipeline().device_log("Li_1spp backward start: Li = ({}, {}, {})", Li[0u], Li[1u], Li[2u]);
             };
 #endif
 
@@ -426,7 +426,7 @@ void MegakernelReplayDiffInstance::_render_one_camera_backward(
 
 #ifdef LUISA_RENDER_PATH_REPLAY_DEBUG
                         $if(all(pixel_id == pixel_checked)) {
-                            pipeline().printer().info("miss and break: Li = ({}, {}, {})", Li[0u], Li[1u], Li[2u]);
+                            pipeline().device_log("miss and break: Li = ({}, {}, {})", Li[0u], Li[1u], Li[2u]);
                         };
 #endif
                     }
@@ -445,7 +445,7 @@ void MegakernelReplayDiffInstance::_render_one_camera_backward(
 
 #ifdef LUISA_RENDER_PATH_REPLAY_DEBUG
                         $if(all(pixel_id == pixel_checked)) {
-                            pipeline().printer().info("after -hit: Li = ({}, {}, {})", Li[0u], Li[1u], Li[2u]);
+                            pipeline().device_log("after -hit: Li = ({}, {}, {})", Li[0u], Li[1u], Li[2u]);
                         };
 #endif
                     };
@@ -510,9 +510,9 @@ void MegakernelReplayDiffInstance::_render_one_camera_backward(
 #ifdef LUISA_RENDER_PATH_REPLAY_DEBUG
                                 $if(all(pixel_id == pixel_checked)) {
                                     auto Li_variation = weight * eval.f * light_sample.eval.L;
-                                    pipeline().printer().info("direct lighting Li_variation = ({}, {}, {})",
+                                    pipeline().device_log("direct lighting Li_variation = ({}, {}, {})",
                                                               Li_variation[0u], Li_variation[1u], Li_variation[2u]);
-                                    pipeline().printer().info("after -direct: Li = ({}, {}, {})", Li[0u], Li[1u], Li[2u]);
+                                    pipeline().device_log("after -direct: Li = ({}, {}, {})", Li[0u], Li[1u], Li[2u]);
                                 };
 #endif
                                 closure->backward(wo, wi, d_loss * weight * light_sample.eval.L);
@@ -559,7 +559,7 @@ void MegakernelReplayDiffInstance::_render_one_camera_backward(
 
 #ifdef LUISA_RENDER_PATH_REPLAY_DEBUG
             $if(all(pixel_id == pixel_checked)) {
-                pipeline().printer().info("should be 0: Li = ({}, {}, {})", Li[0u], Li[1u], Li[2u]);
+                pipeline().device_log("should be 0: Li = ({}, {}, {})", Li[0u], Li[1u], Li[2u]);
             };
 #endif
         };

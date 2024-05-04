@@ -464,8 +464,7 @@ protected:
         
         uint add_x = (photon_per_iter + resolution.y - 1) / resolution.y;
         sampler()->reset(command_buffer, make_uint2(resolution.x + add_x, resolution.y), pixel_count + add_x * resolution.y, spp);
-        
-        command_buffer << pipeline().printer().reset();
+
         command_buffer << compute::synchronize();
         LUISA_INFO(
             "Rendering to '{}' of resolution {}x{} at {}spp.",
@@ -497,9 +496,9 @@ protected:
                 viewpoints->write_grid_len(viewpoints->split(-radius));
             else
                 viewpoints->write_grid_len(node<MegakernelPhotonMappingDiff>()->initial_radius());
-            //camera->pipeline().printer().info("grid:{}", viewpoints->grid_len());
+            //camera->pipeline().device_log("grid:{}", viewpoints->grid_len());
             indirect->write_radius(index, viewpoints->grid_len());
-            //camera->pipeline().printer().info("rad:{}", indirect->radius(index));
+            //camera->pipeline().device_log("rad:{}", indirect->radius(index));
 
             indirect->write_cur_n(index, 0u);
             indirect->write_cur_w(index, 0.f);
@@ -554,7 +553,7 @@ protected:
             auto pixel_id_1d = pixel_id.y * resolution.x + pixel_id.x;
             // $if(pixel_id_1d == 0) {
             //     auto cur_n_tot = indirect->cur_n(0u);
-            //     pipeline().printer().info("photon cur n is {}", cur_n_tot);
+            //     pipeline().device_log("photon cur n is {}", cur_n_tot);
             // };
             auto L = get_indirect(camera->pipeline().spectrum(), pixel_id_1d, tot_photon);
             camera->film()->accumulate(pixel_id, L, 0.5f * spp);
@@ -605,7 +604,6 @@ protected:
         command_buffer << synchronize();
         command_buffer << indirect_draw(node<MegakernelPhotonMappingDiff>()->photon_per_iter(), runtime_spp).dispatch(resolution);
         command_buffer << synchronize();
-        command_buffer << pipeline().printer().retrieve();
         //LUISA_INFO("Finishi indirect_draw");
         progress.done();
         auto render_time = clock.toc();
@@ -825,10 +823,10 @@ protected:
                                     }
                                     indirect->add_phi(pixel_id, Phi*weight);
                                     indirect->add_cur_n(pixel_id, 1u);
-                                    //pipeline().printer().info("working here!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! pixel_id and phi are {}, {} ", pixel_id, Phi);
+                                    //pipeline().device_log("working here!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! pixel_id and phi are {}, {} ", pixel_id, Phi);
                                 };
                                 viewpoint_index = viewpoints->nxt(viewpoint_index);
-                                //pipeline().printer().info("working here!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! pixel_id is ", pixel_id);
+                                //pipeline().device_log("working here!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! pixel_id is ", pixel_id);
                             };
                         };
                     };
@@ -896,8 +894,7 @@ protected:
         
         uint add_x = (photon_per_iter + resolution.y - 1) / resolution.y;
         sampler()->reset(command_buffer, make_uint2(resolution.x + add_x, resolution.y), pixel_count + add_x * resolution.y, spp);
-        
-        command_buffer << pipeline().printer().reset();
+
         command_buffer << compute::synchronize();
         LUISA_INFO(
             "Rendering to '{}' of resolution {}x{} at {}spp.",
@@ -924,9 +921,9 @@ protected:
                 viewpoints->write_grid_len(viewpoints->split(-radius));
             else
                 viewpoints->write_grid_len(node<MegakernelPhotonMappingDiff>()->initial_radius());
-            //camera->pipeline().printer().info("grid:{}", viewpoints->grid_len());
+            //camera->pipeline().device_log("grid:{}", viewpoints->grid_len());
             indirect->write_radius(index, viewpoints->grid_len());
-            //camera->pipeline().printer().info("rad:{}", indirect->radius(index));
+            //camera->pipeline().device_log("rad:{}", indirect->radius(index));
             indirect->write_cur_n(index, 0u);
             indirect->write_cur_w(index, 0.f);
             indirect->write_n_photon(index, 0u);

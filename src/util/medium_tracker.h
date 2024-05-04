@@ -15,7 +15,6 @@ using compute::ArrayVar;
 using compute::Bool;
 using compute::Expr;
 using compute::Float4;
-using compute::Printer;
 using compute::UInt;
 using compute::Var;
 
@@ -35,15 +34,10 @@ private:
     ArrayVar<uint, capacity> _priority_list;
     ArrayVar<MediumInfo, capacity> _medium_list;
     UInt _size;
-    Printer &_printer;
 
 public:
-    explicit MediumTracker(Printer &printer) noexcept;
+    explicit MediumTracker() noexcept;
     MediumTracker(const MediumTracker &) = default;
-
-protected:
-    [[nodiscard]] auto &printer() noexcept { return _printer; }
-    [[nodiscard]] const auto &printer() const noexcept { return _printer; }
 
 public:
     [[nodiscard]] Var<MediumInfo> current() const noexcept;

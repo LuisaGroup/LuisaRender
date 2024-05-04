@@ -73,7 +73,6 @@ void ProgressiveIntegrator::Instance::_render_one_camera(
 
     auto pixel_count = resolution.x * resolution.y;
     sampler()->reset(command_buffer, resolution, pixel_count, spp);
-    command_buffer << pipeline().printer().reset();
     command_buffer << compute::synchronize();
 
     LUISA_INFO(

@@ -6,9 +6,7 @@
 #include "dsl/stmt.h"
 #include "runtime/stream.h"
 #include <core/clock.h>
-#include <core/thread_pool.h>
 #include <util/imageio.h>
-#include <util/half.h>
 #include <base/texture.h>
 #include <base/pipeline.h>
 

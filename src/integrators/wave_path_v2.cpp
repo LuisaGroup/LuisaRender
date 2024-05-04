@@ -493,7 +493,7 @@ void WavefrontPathTracingv2Instance::_render_one_camera(
                 path_id = path_indices.read(dispatch_id);
             }
             //$if(path_id < offset) {
-            //    pipeline().printer().info("path_id {}, offset {}", path_id,offset);
+            //    pipeline().device_log("path_id {}, offset {}", path_id,offset);
             //};
             sampler()->start(pixel_coord, sample_id);
             auto u_filter = sampler()->generate_pixel_2d();
@@ -961,7 +961,7 @@ void WavefrontPathTracingv2Instance::_render_one_camera(
                 queue.write(dispatch_id, new_id);
                 if (gathering)
                     path_states.write_kernel_index(path_id, (uint)INVALID);//in the end, the generation could left some states unchanged
-                //pipeline().printer().info("move {} to {}",path_id, new_id);
+                //pipeline().device_log("move {} to {}",path_id, new_id);
             };
         }
     });
@@ -989,7 +989,7 @@ void WavefrontPathTracingv2Instance::_render_one_camera(
                     queue.write(dispatch_id, new_id);
                 else
                     path_states.write_kernel_index(path_id, (uint)INVALID);//in the end, the generation could left some states unchanged
-                //pipeline().printer().info("move {} to {}",path_id, new_id);
+                //pipeline().device_log("move {} to {}",path_id, new_id);
             };
         }
     });
@@ -1000,7 +1000,7 @@ void WavefrontPathTracingv2Instance::_render_one_camera(
         $if((dispatch_id < size) & (path_id < move_offset)) {
             auto queue_id = queue_size.atomic(0u).fetch_add(1u);
             queue.write(queue_id, path_id);
-            //pipeline().printer().info("{} is a slot", path_id);
+            //pipeline().device_log("{} is a slot", path_id);
         };
     });
 

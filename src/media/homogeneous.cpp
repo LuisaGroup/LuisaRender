@@ -55,7 +55,7 @@ public:
             auto channel = sample_discrete(pdf_channels, rng.uniform_float());
             auto u = rng.uniform_float();
             auto t = -log(max(1.f - u, std::numeric_limits<float>::min())) / sigma_t()[channel];
-            instance()->pipeline().printer().verbose_with_location("HomogeneousMediumClosure::sample: u={}, t={}", u, t);
+            device_log("HomogeneousMediumClosure::sample: u={}, t={}", u, t);
 
             // hit surface
             $if(t > t_max) {
@@ -95,7 +95,7 @@ public:
                     sample_ans.eval.f = Tr * sigma_s();
                     sample_ans.eval.pdf = pdf.sum();
 
-                    instance()->pipeline().printer().verbose_with_location(
+                    device_log(
                         "HomogeneousMediumClosure::sample::scatter\n"
                         "t={}, Tr=({}, {}, {}), \n"
                         "pdf_channels=({}, {}, {}), \n"

@@ -46,7 +46,6 @@ using compute::Image;
 using compute::Mesh;
 using compute::PixelStorage;
 using compute::Polymorphic;
-using compute::Printer;
 using compute::Ray;
 using compute::Resource;
 using compute::Triangle;
@@ -96,7 +95,6 @@ private:
     Buffer<float4x4> _transform_matrix_buffer;
     luisa::unordered_map<luisa::string, uint> _named_ids;
     // other things
-    luisa::unique_ptr<Printer> _printer;
     bool _any_dynamic_transforms{false};
 
 public:
@@ -220,8 +218,6 @@ public:
     void render(Stream &stream) noexcept;
     luisa::vector<void *> render_diff(Stream &stream, luisa::vector<Buffer<float>> &grads) noexcept;
     luisa::vector<void*> render_with_return(Stream &stream) noexcept;
-    [[nodiscard]] auto &printer() noexcept { return *_printer; }
-    [[nodiscard]] auto &printer() const noexcept { return *_printer; }
     [[nodiscard]] uint named_id(luisa::string_view name) const noexcept;
     template<typename T, typename I>
     [[nodiscard]] auto buffer(I &&i) const noexcept { return _bindless_array->buffer<T>(std::forward<I>(i)); }
