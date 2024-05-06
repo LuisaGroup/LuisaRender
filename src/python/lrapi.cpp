@@ -160,6 +160,308 @@ public:
     buffer_ptr(buffer_ptr), value(value){}
 };
 
+class ViewPointMap {
+public:
+    Buffer<uint> _grid_head;
+    Buffer<float3> _beta3;
+    Buffer<float3> _wo;
+    Buffer<float3> _position;
+    Buffer<float3> _grad_pos;
+    Buffer<uint> _pixel_id;
+    Buffer<uint> _surface_tags;
+    Buffer<uint> _nxt;
+    uint _size;//current viewpoint count
+    const Spectrum::Instance *_spectrum;
+    uint _dimension;
+    Buffer<float> _grid_min;//atomic float3
+    Buffer<float> _grid_max;//atomic float3
+    Buffer<float> _grid_len;//the length of a single grid (float1)
+    Buffer<uint> _tot;
+    Buffer<uint> tot_test;
+    float radius;
+public:
+    ViewPointMap(uint viewpointcount, const Spectrum::Instance *spectrum, float radius) {
+        auto &&device = spectrum->pipeline().device();
+
+        _grid_head = device.create_buffer<uint>(viewpointcount);
+        _beta3 = device.create_buffer<float3>(viewpointcount);
+        _wo = device.create_buffer<float3>(viewpointcount);
+        _position = device.create_buffer<float3>(viewpointcount);
+        _pixel_id = device.create_buffer<uint>(viewpointcount);
+        _surface_tags = device.create_buffer<uint>(viewpointcount);
+        _grad_pos = device.create_buffer<float3>(viewpointcount);
+        _nxt = device.create_buffer<uint>(viewpointcount);
+        _tot = device.create_buffer<uint>(1u);
+        _grid_len = device.create_buffer<float>(1u);
+        _grid_min = device.create_buffer<float>(3u);
+        _grid_max = device.create_buffer<float>(3u);
+        tot_test = device.create_buffer<uint>(1u);
+
+        _spectrum = spectrum;
+        _dimension = 3;
+        _size = viewpointcount;
+        this->radius = radius;
+    }
+    auto tot_viewpoint() const noexcept {
+        return _tot->read(0u);
+    }
+    auto grid_len() const noexcept {
+        return _grid_len->read(0u);
+    }
+    auto size() const noexcept {
+        return _size;
+    }
+    auto position(Expr<uint> index) const noexcept {
+        return _position->read(index);
+    }
+    auto wo(Expr<uint> index) const noexcept {
+        return _wo->read(index);
+    }
+    auto beta(Expr<uint> index) const noexcept {
+        return _beta3->read(index);
+    }
+    auto nxt(Expr<uint> index) const noexcept {
+        return _nxt->read(index);
+    }
+    auto grid_head(Expr<uint> index) const noexcept {
+        return _grid_head->read(index);
+    }
+    auto pixel_id(Expr<uint> index) const noexcept {
+        return _pixel_id->read(index);
+    }
+    auto surface_tag(Expr<uint> index) const noexcept {
+        return _surface_tags->read(index);
+    }
+    auto grad_pos(Expr<uint> index) const noexcept {
+        return _grad_pos->read(index);
+    }
+    UInt push(Expr<float3> position, Expr<float3> beta, Expr<float3> wi, Expr<uint> pixel_id, Expr<uint> surface_tag) {
+        auto index = _tot->atomic(0u).fetch_add(1u);
+        _wo->write(index, wi);
+        _position->write(index, position);
+        _pixel_id->write(index, pixel_id);
+        _surface_tags->write(index, surface_tag);
+        _beta3->write(index, beta);
+        for (auto i = 0u; i < 3u; ++i)
+            _grid_min->atomic(i).fetch_min(position[i]);
+        for (auto i = 0u; i < 3u; ++i)
+            _grid_max->atomic(i).fetch_max(position[i]);
+        _nxt->write(index, 0u);
+        return index;
+    }
+    void set_grad_pos(Expr<uint> index, Expr<float3> grad) {
+        _grad_pos->write(index, grad);
+    }
+    //from uint3 grid id to hash index of the grid
+    auto grid_to_index(Expr<int3> p) const noexcept {
+        auto hash = ((p.x * 73856093) ^ (p.y * 19349663) ^
+                        (p.z * 83492791)) %
+                    (_size);
+        return (hash + _size) % _size;
+    }
+    //from float3 position to uint3 grid id
+    auto point_to_grid(Expr<float3> p) const noexcept {
+        Float3 grid_min = {_grid_min->read(0),
+                            _grid_min->read(1),
+                            _grid_min->read(2)};
+        return make_int3((p - grid_min) / grid_len()) + make_int3(2, 2, 2);
+    }
+    auto point_to_index(Expr<float3> p) const noexcept {
+        return grid_to_index(point_to_grid(p));
+    }
+
+    void link(Expr<uint> index) {
+        auto p = _position->read(index);
+        auto grid_index = point_to_index(p);
+        auto head = _grid_head->atomic(grid_index).exchange(index);
+        _nxt->write(index, head);
+    }
+
+    void reset(Expr<uint> index) {
+        _grid_head->write(index, ~0u);
+        _tot->write(0, 0u);
+        _nxt->write(index, ~0u);
+        for (auto i = 0u; i < 3u; ++i) {
+            _grid_min->write(i, std::numeric_limits<float>::max());
+            _grid_max->write(i, -std::numeric_limits<float>::max());
+        }
+    }
+    void write_grid_len(Expr<float> len) {
+        _grid_len->write(0u, len);
+    }
+    auto split(Expr<float> grid_count) const noexcept {
+        auto _grid_size = _spectrum->pipeline().geometry()->world_max() - _spectrum->pipeline().geometry()->world_min();
+        return min(min(_grid_size.x / grid_count, _grid_size.y / grid_count), _grid_size.z / grid_count);
+    }
+};
+class PixelIndirect {
+public:
+    Buffer<float> _radius;
+    Buffer<uint> _cur_n;
+    Buffer<uint> _n_photon;
+    Buffer<float> _phi;
+    Buffer<float> _tau;
+    Buffer<float> _weight;
+    const Spectrum::Instance *_spectrum;
+    bool _shared_radius;
+    uint _viewpoint_per_iter;
+    float _clamp;
+
+public:
+    PixelIndirect(uint viewpoint_per_iter, const Spectrum::Instance *spectrum) {
+        _spectrum = spectrum;
+        _clamp = 1024.0;
+        auto device = spectrum->pipeline().device();
+        auto dimension = 3u;//always save rgb
+        _shared_radius = true;
+        if (_shared_radius) {
+            _radius = device.create_buffer<float>(1);
+            _cur_n = device.create_buffer<uint>(1);
+            _n_photon = device.create_buffer<uint>(1);
+        } else {
+            _radius = device.create_buffer<float>(viewpoint_per_iter);
+            _cur_n = device.create_buffer<uint>(viewpoint_per_iter);
+            _n_photon = device.create_buffer<uint>(viewpoint_per_iter);
+        }
+        _phi = device.create_buffer<float>(viewpoint_per_iter * dimension);
+        _tau = device.create_buffer<float>(viewpoint_per_iter * dimension);
+        _weight = device.create_buffer<float>(viewpoint_per_iter);
+        _viewpoint_per_iter = viewpoint_per_iter;
+    }
+    void write_radius(Expr<uint> pixel_id, Expr<float> value) noexcept {
+        if (!_shared_radius) {
+            _radius->write(pixel_id, value);
+        } else {
+            _radius->write(0u, value);
+        }
+    }
+    void write_cur_n(Expr<uint> pixel_id, Expr<uint> value) noexcept {
+        if (!_shared_radius) {
+            _cur_n->write(pixel_id, value);
+        } else {
+            _cur_n->write(0u, value);
+        }
+    }
+
+    void write_n_photon(Expr<uint> pixel_id, Expr<uint> value) noexcept {
+        if (!_shared_radius) {
+            _n_photon->write(pixel_id, value);
+        } else {
+            _n_photon->write(0u, value);
+        }
+    }
+
+    void reset_phi(Expr<uint> pixel_id) noexcept {
+        auto dimension = 3u;
+        for (auto i = 0u; i < dimension; ++i)
+            _phi->write(pixel_id * dimension + i, 0.f);
+    }
+
+    void reset_tau(Expr<uint> pixel_id) noexcept {
+        auto dimension = 3u;
+        for (auto i = 0u; i < dimension; ++i)
+            _tau->write(pixel_id * dimension + i, 0.f);
+    }
+
+    auto radius(Expr<uint> pixel_id) const noexcept {
+        if (!_shared_radius) {
+            return _radius->read(pixel_id);
+        } else {
+            return _radius->read(0u);
+        }
+    }
+
+    //tau=(tau+clamp(phi))*value, see pixel_info_update for useage
+    void update_tau(Expr<uint> pixel_id, Expr<float> value) noexcept {
+        auto dimension = 3u;
+        auto thershold = _clamp;
+        for (auto i = 0u; i < dimension; ++i) {
+            auto old_tau = _tau->read(pixel_id * dimension + i);
+            auto phi = _phi->read(pixel_id * dimension + i);
+            phi = max(-thershold, min(phi, thershold));//-thershold for wavelength sampling
+            _tau->write(pixel_id * dimension + i, (old_tau + phi) * value);
+        }
+    }
+
+    auto n_photon(Expr<uint> pixel_id) const noexcept {
+        if (!_shared_radius) {
+            return _n_photon->read(pixel_id);
+        } else {
+            return _n_photon->read(0u);
+        }
+    }
+
+    auto cur_n(Expr<uint> pixel_id) const noexcept {
+        if (!_shared_radius) {
+            return _cur_n->read(pixel_id);
+        } else {
+            return _cur_n->read(0u);
+        }
+    }
+    
+
+    auto phi(Expr<uint> pixel_id) const noexcept {
+        auto dimension = 3u;
+        Float3 ret;
+        for (auto i = 0u; i < dimension; ++i)
+            ret[i] = _phi->read(pixel_id * dimension + i);
+        return ret;
+    }
+    
+    auto tau(Expr<uint> pixel_id) const noexcept {
+        auto dimension = 3u;
+        Float3 ret;
+        for (auto i = 0u; i < dimension; ++i)
+            ret[i] = _tau->read(pixel_id * dimension + i);
+        return ret;
+    }
+
+    void add_cur_n(Expr<uint> pixel_id, Expr<uint> value) noexcept {
+        if (!_shared_radius) {
+            _cur_n->atomic(pixel_id).fetch_add(value);
+        } else {
+            _cur_n->atomic(0u).fetch_add(value);
+        }
+    }
+
+    void add_phi(Expr<uint> pixel_id, Expr<float3> phi) noexcept {
+        auto dimension = 3u;
+        for (auto i = 0u; i < dimension; ++i)
+            _phi->atomic(pixel_id * dimension + i).fetch_add(phi[i]);
+    }
+
+    void pixel_info_update(Expr<uint> pixel_id) {
+        $if(cur_n(pixel_id) > 0) {
+            Float gamma = 2.0f / 3.0f;
+            UInt n_new = n_photon(pixel_id) + cur_n(pixel_id);
+            Float r_new = radius(pixel_id) * sqrt(n_new * gamma / (n_photon(pixel_id) * gamma + cur_n(pixel_id)));
+            //indirect->write_tau(pixel_id, (indirect->tau(pixel_id) + indirect->phi(pixel_id)) * (r_new * r_new) / (indirect->radius(pixel_id) * indirect->radius(pixel_id)));
+            update_tau(pixel_id, r_new * r_new / (radius(pixel_id) * radius(pixel_id)));
+            if (!_shared_radius) {
+                write_n_photon(pixel_id, n_new);
+                write_cur_n(pixel_id, 0u);
+                write_radius(pixel_id, r_new);
+            }
+            reset_phi(pixel_id);
+        };
+    }
+
+    void shared_update() {
+        auto pixel_id = 0u;
+        $if(cur_n(pixel_id) > 0) {
+            Float gamma = 2.0f / 3.0f;
+            UInt n_new = n_photon(pixel_id) + cur_n(pixel_id);
+            Float r_new = radius(pixel_id) * sqrt(n_new * gamma / (n_photon(pixel_id) * gamma + cur_n(pixel_id)));
+            write_n_photon(pixel_id, n_new);
+            write_cur_n(pixel_id, 0u);
+            write_radius(pixel_id, r_new);
+        };
+    }
+};
+
+unique_ptr<PixelIndirect> indirect;
+unique_ptr<ViewPointMap> viewpoint_map;
+
 PYBIND11_MODULE(_lrapi, m) {
     m.doc() = "LuisaRender API";// optional module docstring
     // log
@@ -173,6 +475,257 @@ PYBIND11_MODULE(_lrapi, m) {
         log_level_info();
         LUISA_INFO("LuisaRender API init");
     });
+    m.def("init_viewpointmap", [](uint viewpoints, float radius) {
+        LUISA_INFO("LuisaRender init_viewpointmap");
+        viewpoint_map = make_unique<ViewPointMap>(viewpoints, scene_python._pipeline->spectrum(), radius);
+        indirect = make_unique<PixelIndirect>(viewpoints, scene_python._pipeline->spectrum());
+
+        Kernel1D viewpointreset_kernel = [&]() noexcept {
+            auto index = static_cast<UInt>(dispatch_x());
+            viewpoint_map->reset(index);
+        };
+
+        Kernel1D indirect_initialize_kernel = [&]() noexcept {
+            auto index = static_cast<UInt>(dispatch_x());
+            indirect->write_radius(index, radius);
+            viewpoint_map->write_grid_len(radius);
+            indirect->write_cur_n(index, 0u);
+            indirect->write_n_photon(index, 0u);
+            indirect->reset_phi(index);
+            indirect->reset_tau(index);
+        };
+        auto viewpointreset = scene_python._pipeline->device().compile(viewpointreset_kernel);
+        auto indirect_initialize = scene_python._pipeline->device().compile(indirect_initialize_kernel);
+        *scene_python._stream << viewpointreset().dispatch(viewpoints);
+        *scene_python._stream << indirect_initialize().dispatch(viewpoints);
+        *scene_python._stream << synchronize();
+
+    });
+    m.def("add_viewpoint", [](uint64_t pos_ptr, uint64_t wi_ptr, uint64_t beta_ptr, uint size, bool debug) {
+
+        auto pos_buffer = scene_python._pipeline->device().import_external_buffer<float>(reinterpret_cast<void *>(pos_ptr),size*3);
+        auto wi_buffer = scene_python._pipeline->device().import_external_buffer<float>(reinterpret_cast<void *>(wi_ptr),size*3);
+        auto beta_buffer = scene_python._pipeline->device().import_external_buffer<float>(reinterpret_cast<void *>(beta_ptr),size*3);
+
+        Kernel1D viewpointreset_kernel = [&]() noexcept {
+            auto index = static_cast<UInt>(dispatch_x());
+            viewpoint_map->reset(index);
+        };
+        Kernel1D add_viewpoint_kernel = [&](Bool debug) noexcept {
+            auto index = static_cast<UInt>(dispatch_x());
+            auto pos = make_float3(pos_buffer->read(index*3+0),pos_buffer->read(index*3+1),pos_buffer->read(index*3+2));
+            auto wi = make_float3(wi_buffer->read(index*3+0),wi_buffer->read(index*3+1),wi_buffer->read(index*3+2));
+            auto beta = make_float3(beta_buffer->read(index*3+0),beta_buffer->read(index*3+1),beta_buffer->read(index*3+2));
+            $if(pos[0]>-500.f)
+            {
+                $if(debug)
+                {
+                    device_log("index {} pos: {}, wi: {}, beta: {}",index, pos, wi, beta);
+                };
+                viewpoint_map->push(pos, beta, wi, index, 0u);
+            };
+            //device_log("index {} pos: {}, wi: {}, beta: {}",index, pos, wi, beta);
+        };
+
+        Kernel1D build_grid_kernel = [&]() noexcept {
+            auto index = static_cast<UInt>(dispatch_x());
+            $if(viewpoint_map->nxt(index) == 0u) {
+                viewpoint_map->link(index);
+            };
+        };
+
+        auto viewpointreset = scene_python._pipeline->device().compile(viewpointreset_kernel);
+        *scene_python._stream << viewpointreset().dispatch(viewpoint_map->size()) << synchronize();
+
+        auto add_viewpoint = scene_python._device->compile(add_viewpoint_kernel);
+        auto build_grid = scene_python._device->compile(build_grid_kernel);
+
+        *scene_python._stream << add_viewpoint(debug).dispatch(size) << synchronize();
+        LUISA_INFO("LuisaRender add_viewpoint");
+        
+        *scene_python._stream << build_grid().dispatch(size) << synchronize();
+        LUISA_INFO("LuisaRender build_grid");
+    });
+
+    m.def("indirect_update", []() {
+        LUISA_INFO("LuisaRender indirect_update");
+        Kernel1D indirect_update_kernel = [&]() noexcept {
+            set_block_size(16u, 16u, 1u);
+            auto pixel_id = dispatch_x();
+            indirect->pixel_info_update(pixel_id);
+        };
+
+        Kernel1D shared_update_kernel = [&]() noexcept {
+            indirect->shared_update();
+            viewpoint_map->write_grid_len(indirect->radius(0u));
+        };
+
+        auto indirect_update = scene_python._device->compile(indirect_update_kernel);
+        auto shared_update = scene_python._device->compile(shared_update_kernel);
+
+        *scene_python._stream << indirect_update().dispatch(viewpoint_map->size());
+        *scene_python._stream << shared_update().dispatch(1u) << synchronize();
+    });
+
+    m.def("get_indirect", [](uint64_t buffer_ptr, uint size, uint tot_photon, bool debug) {
+        LUISA_INFO("LuisaRender get_indirect");
+        auto ind_buffer = scene_python._pipeline->device().import_external_buffer<float>(reinterpret_cast<void *>(buffer_ptr),size*3);
+        Kernel1D indirect_draw_kernel = [&](Bool debug) noexcept {
+            auto index = dispatch_x();
+            auto r = indirect->radius(index);
+            auto tau = indirect->tau(index);
+            auto L = tau / (tot_photon * pi * r * r);
+            $if(debug)
+            {
+                device_log("index {} tau: {}, L: {}, r: {}",index, tau, L, r);
+            };
+            ind_buffer->write(index*3+0, L[0]);
+            ind_buffer->write(index*3+1, L[1]);
+            ind_buffer->write(index*3+2, L[2]);
+            //camera->film()->accumulate(pixel_id, L, 0.5f * spp);
+        };
+        auto indirect_draw = scene_python._device->compile(indirect_draw_kernel);
+        *scene_python._stream << indirect_draw(debug).dispatch(size) << synchronize();
+        //return reinterpret_cast<uint64_t>(ind_buffer.native_handle());
+    });
+
+    m.def("update_grad", [](uint64_t grad_buffer_ptr, uint size, bool debug) {
+        LUISA_INFO("LuisaRender update_grad");
+        auto grad_buffer = scene_python._pipeline->device().import_external_buffer<float>(reinterpret_cast<void *>(grad_buffer_ptr),size*3);
+        Kernel1D update_grad_kernel = [&](Bool debug) noexcept {
+            auto index = dispatch_x();
+            auto grad = make_float3(grad_buffer->read(index*3+0),grad_buffer->read(index*3+1),grad_buffer->read(index*3+2));
+            $if(debug){
+                device_log("index {} grad: {}",index, grad);
+            };
+            viewpoint_map->set_grad_pos(index, grad);
+        };
+        auto update_grad = scene_python._device->compile(update_grad_kernel);
+        *scene_python._stream << update_grad(debug).dispatch(size) << synchronize();
+    });
+
+    m.def("accum_ind", [](uint64_t pos_ptr,uint64_t wi_ptr, uint64_t beta_ptr, uint size, bool debug) {
+
+        LUISA_INFO("LuisaRender accum ind");
+        auto pos_buffer = scene_python._pipeline->device().import_external_buffer<float>(reinterpret_cast<void *>(pos_ptr),size*3);
+        auto wi_buffer = scene_python._pipeline->device().import_external_buffer<float>(reinterpret_cast<void *>(wi_ptr),size*3);
+        auto beta_buffer = scene_python._pipeline->device().import_external_buffer<float>(reinterpret_cast<void *>(beta_ptr),size*3);
+
+        Kernel1D query_kernel = [&](Bool debug) noexcept{
+            auto index = dispatch_x();
+            
+            auto pos = make_float3(pos_buffer->read(index*3+0),pos_buffer->read(index*3+1),pos_buffer->read(index*3+2));
+            auto wi_local = make_float3(wi_buffer->read(index*3+0),wi_buffer->read(index*3+1),wi_buffer->read(index*3+2));
+            auto beta = make_float3(beta_buffer->read(index*3+0),beta_buffer->read(index*3+1),beta_buffer->read(index*3+2));
+            
+            auto grid = viewpoint_map->point_to_grid(pos);
+            $if(debug){
+                device_log("index {} pos: {}, wi: {}, beta: {} grid {}",index, pos, wi_local, beta, grid);
+            };
+            auto radius = viewpoint_map->radius;
+            Float3 ind{0.0f, 0.0f, 0.0f};
+            $for(x, grid.x - 1, grid.x + 2) {
+                $for(y, grid.y - 1, grid.y + 2) {
+                    $for(z, grid.z - 1, grid.z + 2) {
+                        Int3 check_grid{x, y, z};
+                        auto viewpoint_index = viewpoint_map->grid_head(viewpoint_map->grid_to_index(check_grid));
+                        $if(debug){
+                            device_log("index {} viewpoint_index: ",index, viewpoint_index);
+                        };
+                        $while(viewpoint_index != ~0u) {
+                            auto position = viewpoint_map->position(viewpoint_index);
+                            auto pixel_id = viewpoint_map->pixel_id(viewpoint_index);
+                            auto dis = distance(position, pos);
+                            $if(dis <= radius) {
+                                auto viewpointwo = viewpoint_map->wo(viewpoint_index);
+                                auto viewpointbeta = viewpoint_map->beta(viewpoint_index);
+                                auto rel_dis = dis / radius;
+                                auto weight = 3.5f*(1.0f- 6 * pow(rel_dis, 5.) + 15 * pow(rel_dis, 4.) - 10 * pow(rel_dis, 3.));
+                                auto Phi = viewpointbeta*beta*weight/max(0.01f,abs_cos_theta(wi_local));
+                                indirect->add_phi(pixel_id, Phi);
+                                indirect->add_cur_n(pixel_id, 1u);
+                                $if(debug){
+                                    device_log("index {} pos: {}, wi: {}, beta: {}, weight: {}, Phi: {}, pixel_id {}",index, pos, wi_local, beta, weight, Phi, pixel_id);
+                                };
+                            };
+                            viewpoint_index = viewpoint_map->nxt(viewpoint_index);
+                        };
+                    };
+                };
+            };
+            // pos_buffer->write(index*3+0, ind[0]/(3.1415926f*radius*radius));
+            // pos_buffer->write(index*3+1, ind[1]/(3.1415926f*radius*radius));
+            // pos_buffer->write(index*3+2, ind[2]/(3.1415926f*radius*radius));
+        };
+        auto query_ind = scene_python._device->compile(query_kernel);
+        *scene_python._stream << query_ind(debug).dispatch(size) << synchronize();
+        // return reinterpret_cast<uint64_t>(pos_buffer.native_handle());
+    });
+
+    m.def("compute_ind_grad", [](uint64_t pos_ptr,uint64_t wi_ptr, uint64_t beta_ptr, uint size, uint tot_photon) {
+
+        LUISA_INFO("LuisaRender compute_ind_grad");
+        auto pos_buffer = scene_python._pipeline->device().import_external_buffer<float>(reinterpret_cast<void *>(pos_ptr),size*3);
+        auto wi_buffer = scene_python._pipeline->device().import_external_buffer<float>(reinterpret_cast<void *>(wi_ptr),size*3);
+        auto beta_buffer = scene_python._pipeline->device().import_external_buffer<float>(reinterpret_cast<void *>(beta_ptr),size*3);
+
+        Kernel1D compute_kernel = [&]() noexcept{
+            auto index = dispatch_x();
+        
+            auto pos = make_float3(pos_buffer->read(index*3+0),pos_buffer->read(index*3+1),pos_buffer->read(index*3+2));
+            auto wi_local = make_float3(wi_buffer->read(index*3+0),wi_buffer->read(index*3+1),wi_buffer->read(index*3+2));
+            auto beta = make_float3(beta_buffer->read(index*3+0),beta_buffer->read(index*3+1),beta_buffer->read(index*3+2));
+    
+            auto grid = viewpoint_map->point_to_grid(pos);
+            Float3 grad_pos{0.0f, 0.0f, 0.0f};
+            Float3 grad_beta{0.0f, 0.0f, 0.0f};
+            Float grad_dis{0.0f};
+            $for(x, grid.x - 1, grid.x + 2) {
+                $for(y, grid.y - 1, grid.y + 2) {
+                    $for(z, grid.z - 1, grid.z + 2) {
+                        Int3 check_grid{x, y, z};
+                        auto viewpoint_index = viewpoint_map->grid_head(viewpoint_map->grid_to_index(check_grid));
+                        $while(viewpoint_index != ~0u) {
+                            auto position = viewpoint_map->position(viewpoint_index);
+                            auto pixel_id = viewpoint_map->pixel_id(viewpoint_index);
+                            auto radius = indirect->radius(pixel_id);
+                            auto dis = distance(position, pos);
+                            $if(dis <= radius) {
+                                auto viewpointwo = viewpoint_map->wo(viewpoint_index);
+                                auto viewpointbeta = viewpoint_map->beta(viewpoint_index);
+                                auto grad_view = viewpoint_map->grad_pos(pixel_id);
+                                auto Phi = viewpointbeta/max(0.01f,abs_cos_theta(wi_local));
+                                $autodiff {
+                                    requires_grad(pos, beta);
+                                    auto rel_dis = distance(position, pos) / radius;
+                                    requires_grad(rel_dis);
+                                    auto rel3 = rel_dis*rel_dis*rel_dis;
+                                    auto weight = 3.5f*(1- 6*rel3*rel_dis*rel_dis + 15*rel3*rel_dis - 10*rel3);
+                                    auto Phi_beta_weight = Phi * beta * weight;
+                                    auto contrib = Phi_beta_weight / (tot_photon * pi * radius * radius);
+                                    auto dldPhi = (contrib[0u]*grad_view[0] + contrib[1u]*grad_view[1] + contrib[2u]*grad_view[2]);
+                                    backward(dldPhi);
+                                    grad_pos += grad(pos);
+                                    grad_beta += grad(beta);
+                                    grad_dis = grad(rel_dis);
+                                };
+                            };
+                            viewpoint_index = viewpoint_map->nxt(viewpoint_index);
+                        };
+                    };
+                };
+            };
+            pos_buffer->write(index*3+0, grad_pos[0]);
+            pos_buffer->write(index*3+0, grad_pos[1]);
+            pos_buffer->write(index*3+0, grad_pos[2]);
+            beta_buffer->write(index*3+0, grad_beta[0]);
+            beta_buffer->write(index*3+0, grad_beta[1]);
+            beta_buffer->write(index*3+0, grad_beta[2]);
+        };
+        auto compute_grad = scene_python._device->compile(compute_kernel);
+        *scene_python._stream << compute_grad().dispatch(size) << synchronize();
+    });
+
     m.def("load_scene", [](std::vector<std::string> &argvs){
         int argc = argvs.size();
         LUISA_INFO("Argc: {}", argc);
@@ -354,6 +907,6 @@ PYBIND11_MODULE(_lrapi, m) {
     //     .def("render", &Pipeline::render);
     //     .def("update_texture", &Pipeline::update_texture);
     //     .def("update_mesh", &Pipeline::update_mesh);
-
+    
 }
 

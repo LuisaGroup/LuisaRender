@@ -231,7 +231,7 @@ private:
     }
 
     void _display() const noexcept {
-        auto scale = luisa::exp2(_exposure);
+        auto scale = 1.0f;
         auto is_ldr = _window->framebuffer().storage() != PixelStorage::FLOAT4;
         auto size = _framebuffer.size();
         *_stream << _blit(_tone_mapping, is_ldr, scale).dispatch(size);

@@ -68,7 +68,7 @@ optimizer = torch.optim.Adam([vertex_height], lr=0.001)
 vertex_height.requires_grad_()
 
 
-vertex_pos[...,1] = ((vertex_pos[...,1]-1)*0.05)+1
+#vertex_pos[...,1] = ((vertex_pos[...,1]-1)*0.05)+1
 gt_param = vertex_pos[...,1].clone()
 vertex_normal = compute_vertex_normals(vertex_pos, face_ids_torch)
 vertex[...,0:3] = vertex_pos
@@ -86,7 +86,7 @@ luisarender.update_scene([x])
 target_img = cu_device_ptr_to_torch_tensor(luisarender.render()[0], (512, 512, 4)).clone()
 imageio.imwrite("gt_0.05.exr",target_img.detach().cpu().numpy()[...,:3])
 imageio.imwrite("gt.png",target_img.detach().cpu().numpy()[...,:3])
-
+exit()
 #print(torch.max(target_img), torch.min(target_img), torch.sum(target_img))
 
 

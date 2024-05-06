@@ -1368,6 +1368,7 @@ protected:
                                         grad_beta += grad(beta_diff);
                                         grad_dis = grad(rel_dis_diff);
                                     };
+                                    
                                     auto grad_b = get_bary_grad(grad_p, it->instance_id(), it->triangle_id());
                                     count_neighbors += 1u;
                                     grad_bary += grad_b;
