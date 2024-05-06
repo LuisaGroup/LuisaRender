@@ -111,11 +111,13 @@ private:
             surface->closure(call, it, swl, wo, 1.f, time);
         });
         call.execute([&](auto closure) noexcept {
-            $if(light_sample.eval.pdf > 0.f) {
-                auto wi = light_sample.shadow_ray->direction();
-                auto eval = closure->evaluate(wo, wi);
-                pdf = light_sample.eval.pdf;
-                L = eval.f * light_sample.eval.L;
+            $outline {
+                $if(light_sample.eval.pdf > 0.f) {
+                    auto wi = light_sample.shadow_ray->direction();
+                    auto eval = closure->evaluate(wo, wi);
+                    pdf = light_sample.eval.pdf;
+                    L = eval.f * light_sample.eval.L;
+                };
             };
         });
         return std::make_pair(L, pdf);
@@ -280,7 +282,7 @@ private:
             };
             // perturb the light samples to reduce correlation, use Metropolis to determine whether to accept the perturbation
             $if(enable_decorrelation) {
-                auto constexpr MARKOV_CHAIN_LENGTH = 4u;
+                auto constexpr MARKOV_CHAIN_LENGTH = 8u;
                 auto sample_box_muller = [](Expr<float2> u) noexcept {
                     auto r = sqrt(clamp(-2.f * log(u.x), 0.f, 1.f));
                     auto theta = 2.f * pi * u.y;
