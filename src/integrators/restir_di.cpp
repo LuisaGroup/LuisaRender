@@ -260,17 +260,6 @@ private:
                 candidate.weight.total_weight = ite(pdf == 0.f, 0.f, candidate.weight.target_pdf / pdf);
                 reservoir.update(candidate, sampler()->generate_1d());
             };
-            // visibility reuse
-            $if(enable_visibility_reuse) {
-                auto light_sample = LightSampler::Sample::zero(swl.dimension());
-                $outline {
-                    light_sample = light_sampler()->sample_light(*it, {reservoir.sample.tag, 1.f}, reservoir.sample.u_light_surface, swl, time);
-                };
-                auto occluded = pipeline().geometry()->intersect_any(light_sample.shadow_ray);
-                $if(light_sample.eval.pdf == 0.f | occluded) {
-                    reservoir.weight.total_weight = 0.f;
-                };
-            };
             // temporal reuse
             $if(enable_temporal_reuse & frame_index != 0u) {
                 auto prev_frame_view_matrix = _prev_frame_view_matrix->read(0u);
@@ -291,31 +280,31 @@ private:
             };
             // perturb the light samples to reduce correlation, use Metropolis to determine whether to accept the perturbation
             $if(enable_decorrelation) {
-                $outline {
-                    auto constexpr markov_chain_length = 8u;
-                    auto sample_box_muller = [](Expr<float2> u) noexcept {
-                        auto r = sqrt(clamp(-2.f * log(u.x), 0.f, 1.f));
-                        auto theta = 2.f * pi * u.y;
-                        return make_float2(r * cos(theta), r * sin(theta));
-                    };
-                    auto u_markov = sampler()->generate_1d();
-                    $for(markov_iter, markov_chain_length) {
-                        // offset the sample location on the light surface
-                        auto candidate = reservoir;
-                        auto perturbation = 0.05f * sample_box_muller(sampler()->generate_2d());
-                        candidate.sample.u_light_surface = reservoir.sample.u_light_surface + perturbation;
-                        $if(any(candidate.sample.u_light_surface < 0.f) | any(candidate.sample.u_light_surface > 1.f)) { $continue; };
-                        auto [L, pdf] = _evaluate_without_occlusion(candidate.sample, *it, wo, swl, time);
-                        candidate.weight.target_pdf = pipeline().spectrum()->cie_y(swl, L);
-                        auto accepting_prob = candidate.weight.target_pdf / reservoir.weight.target_pdf;
-                        candidate.weight.total_weight *= accepting_prob;
-                        accepting_prob = min(1.f, accepting_prob);
-                        $if(u_markov < accepting_prob) {
-                            reservoir = candidate;
-                            u_markov /= accepting_prob;
-                        } $else {
-                            u_markov = (u_markov - accepting_prob) / (1.f - accepting_prob);
-                        };
+                auto constexpr MARKOV_CHAIN_LENGTH = 4u;
+                auto sample_box_muller = [](Expr<float2> u) noexcept {
+                    auto r = sqrt(clamp(-2.f * log(u.x), 0.f, 1.f));
+                    auto theta = 2.f * pi * u.y;
+                    return make_float2(r * cos(theta), r * sin(theta));
+                };
+                auto markov_weight = def(0.f);
+                $if(reservoir.weight.total_weight > 0.f) {
+                    auto [_, pdf] = _evaluate_without_occlusion(reservoir.sample, *it, wo, swl, time);
+                    markov_weight = reservoir.weight.target_pdf / pdf;
+                };
+                $for(markov_iter, MARKOV_CHAIN_LENGTH) {
+                    auto candidate = reservoir;
+                    auto perturbation = 0.01f * sample_box_muller(sampler()->generate_2d());
+                    candidate.sample.u_light_surface = reservoir.sample.u_light_surface + perturbation;
+                    $if(any(candidate.sample.u_light_surface < 0.f) | any(candidate.sample.u_light_surface > 1.f)) { $continue; };
+                    auto [L, pdf] = _evaluate_without_occlusion(candidate.sample, *it, wo, swl, time);
+                    $if(pdf == 0.f) { $continue; };
+                    candidate.weight.target_pdf = pipeline().spectrum()->cie_y(swl, L);
+                    auto candidate_markov_weight = candidate.weight.target_pdf / pdf;
+                    auto accepting_prob = min(1.f, ite(markov_weight == 0.f, 1.f, candidate_markov_weight / markov_weight));
+                    candidate.weight.total_weight *= candidate.weight.target_pdf / reservoir.weight.target_pdf;
+                    $if(sampler()->generate_1d() < accepting_prob) {
+                        markov_weight = candidate_markov_weight;
+                        reservoir = candidate;
                     };
                 };
             };
