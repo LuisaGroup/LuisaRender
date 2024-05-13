@@ -389,7 +389,7 @@ private:
                     auto neighbor_ray = valid_neighbor_ray_array[neighbor_index];
                     auto neighbor_hit = valid_neighbor_hit_array[neighbor_index];
                     auto neighbor_it = pipeline().geometry()->interaction(neighbor_ray, neighbor_hit);
-                    auto [L, _] = _evaluate_without_occlusion(reservoir.sample, *neighbor_it, -neighbor_ray->direction(), swl, time);
+                    auto [L, _] = _evaluate_with_occlusion(reservoir.sample, *neighbor_it, -neighbor_ray->direction(), swl, time);
                     $if(any(L > 0.f)) {
                         z += valid_neighbor_m_array[neighbor_index];
                     };
@@ -481,7 +481,7 @@ private:
                             auto neighbor_ray = _visibility_buffer->ray(neighbor_id);
                             auto neighbor_hit = _visibility_buffer->hit(neighbor_id);
                             auto neighbor_it = pipeline().geometry()->interaction(neighbor_ray, neighbor_hit);
-                            auto [L, _] = _evaluate_without_occlusion(reservoir.sample, *neighbor_it, -neighbor_ray->direction(), swl, time);
+                            auto [L, _] = _evaluate_with_occlusion(reservoir.sample, *neighbor_it, -neighbor_ray->direction(), swl, time);
                             $if(any(L > 0.f)) {
                                 z += valid_neighbor_m_array[neighbor_index];
                             };
