@@ -96,59 +96,45 @@ private:
                                                                                 const SampledWavelengths &swl, Expr<float> time) const noexcept {
         auto L = SampledSpectrum{swl.dimension(), 0.f};
         auto pdf = def(0.f);
-        auto prob = def(0.f);
-        $outline {
-            prob = light_sampler()->evaluate_selection(sample.tag, it.p(), swl, time);
-        };
+        auto prob = light_sampler()->evaluate_selection(sample.tag, it.p(), swl, time);
         auto sel = LightSampler::Selection{sample.tag, prob};
-        auto light_sample = LightSampler::Sample::zero(swl.dimension());
-        $outline {
-            light_sample = light_sampler()->sample_light(it, sel, sample.u_light_surface, swl, time);
+        auto light_sample = light_sampler()->sample_light(it, sel, sample.u_light_surface, swl, time);
+        $if(light_sample.eval.pdf > 0.f) {
+            auto surface_tag = it.shape().surface_tag();
+            PolymorphicCall<Surface::Closure> call;
+            pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
+                surface->closure(call, it, swl, wo, 1.f, time);
+            });
+            call.execute([&](auto closure) noexcept {
+                auto wi = light_sample.shadow_ray->direction();
+                auto eval = closure->evaluate(wo, wi);
+                pdf = light_sample.eval.pdf;
+                L = eval.f * light_sample.eval.L;
+            });
         };
-        auto surface_tag = it.shape().surface_tag();
-        PolymorphicCall<Surface::Closure> call;
-        pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
-            surface->closure(call, it, swl, wo, 1.f, time);
-        });
-        call.execute([&](auto closure) noexcept {
-            $outline {
-                $if(light_sample.eval.pdf > 0.f) {
-                    auto wi = light_sample.shadow_ray->direction();
-                    auto eval = closure->evaluate(wo, wi);
-                    pdf = light_sample.eval.pdf;
-                    L = eval.f * light_sample.eval.L;
-                };
-            };
-        });
         return std::make_pair(L, pdf);
     }
     [[nodiscard]] std::pair<SampledSpectrum, Float> _evaluate_with_occlusion(const ReservoirSample &sample, const Interaction &it, Expr<float3> wo,
                                                                              const SampledWavelengths &swl, Expr<float> time) const noexcept {
         auto L = SampledSpectrum{swl.dimension(), 0.f};
         auto pdf = def(0.f);
-        auto prob = def(0.f);
-        $outline {
-            prob = light_sampler()->evaluate_selection(sample.tag, it.p(), swl, time);
-        };
+        auto prob = light_sampler()->evaluate_selection(sample.tag, it.p(), swl, time);
         auto sel = LightSampler::Selection{sample.tag, prob};
-        auto light_sample = LightSampler::Sample::zero(swl.dimension());
-        $outline {
-            light_sample = light_sampler()->sample_light(it, sel, sample.u_light_surface, swl, time);
-        };
+        auto light_sample= light_sampler()->sample_light(it, sel, sample.u_light_surface, swl, time);
         auto occluded = pipeline().geometry()->intersect_any(light_sample.shadow_ray);
-        auto surface_tag = it.shape().surface_tag();
-        PolymorphicCall<Surface::Closure> call;
-        pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
-            surface->closure(call, it, swl, wo, 1.f, time);
-        });
-        call.execute([&](auto closure) noexcept {
-            $if(light_sample.eval.pdf > 0.f & !occluded) {
+        $if(!occluded & light_sample.eval.pdf > 0.f) {
+            auto surface_tag = it.shape().surface_tag();
+            PolymorphicCall<Surface::Closure> call;
+            pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
+                surface->closure(call, it, swl, wo, 1.f, time);
+            });
+            call.execute([&](auto closure) noexcept {
                 auto wi = light_sample.shadow_ray->direction();
                 auto eval = closure->evaluate(wo, wi);
                 pdf = light_sample.eval.pdf;
                 L = eval.f * light_sample.eval.L;
-            };
-        });
+            });
+        };
         return std::make_pair(L, pdf);
     }
 
@@ -329,7 +315,7 @@ private:
         _spatial_reservoir_buffer->write(reservoir, pixel_id);
     }
     void _spatial_pass(const Camera::Instance *camera, Expr<uint> frame_index, Expr<uint2> pixel_id, Expr<float> time,
-                       Expr<bool> unbiased) const noexcept {
+                       Expr<bool> unbiased, Expr<bool> enable_visibility_reuse) const noexcept {
         auto resolution = camera->film()->node()->resolution();
         sampler()->start(pixel_id << 1u, frame_index);
         auto spectrum = pipeline().spectrum();
@@ -358,6 +344,7 @@ private:
                 auto theta = 2.f * pi * u_theta;
                 auto offset = make_float2(radius * cos(theta), radius * sin(theta));
                 auto neighbor_id = make_uint2(clamp(make_float2(pixel_id) + offset, make_float2(0.f), make_float2(resolution) - 1.f));
+                $if(all(neighbor_id == pixel_id)) { $continue; };
                 auto neighbor_ray = _visibility_buffer->ray(neighbor_id);
                 auto neighbor_hit = _visibility_buffer->hit(neighbor_id);
                 auto neighbor_it = pipeline().geometry()->interaction(neighbor_ray, neighbor_hit);
@@ -365,21 +352,24 @@ private:
                     auto neighbor_pixel_depth = dot(depth_projector.xyz(), neighbor_it->p()) + depth_projector.w;
                     $if(abs(neighbor_pixel_depth - current_pixel_depth) < 0.05f * abs(current_pixel_depth) &
                         dot(it->ng(), neighbor_it->ng()) > 0.91f) {
-                        auto neighbor_reservoir = Reservoir::zero();
-                        neighbor_reservoir = _spatial_reservoir_buffer->read(neighbor_id);
-                        $if(dsl::isnan(neighbor_reservoir.weight.total_weight) | dsl::isnan(neighbor_reservoir.weight.target_pdf)) { $continue; };
-                        auto [L, pdf] = _evaluate_without_occlusion(neighbor_reservoir.sample, *it, wo, swl, time);
-                        $if(neighbor_reservoir.weight.target_pdf > 0.f) {
-                            auto neighbor_target_pdf = pipeline().spectrum()->cie_y(swl, L);
-                            neighbor_reservoir.weight.total_weight *= neighbor_target_pdf / neighbor_reservoir.weight.target_pdf;
-                            neighbor_reservoir.weight.target_pdf = neighbor_target_pdf;
-                            reservoir.update(neighbor_reservoir, sampler()->generate_1d());
-                            $if(unbiased) {
-                                valid_neighbor_ray_array[num_valid_neighbor] = neighbor_ray;
-                                valid_neighbor_hit_array[num_valid_neighbor] = neighbor_hit;
-                                valid_neighbor_m_array[num_valid_neighbor] = neighbor_reservoir.weight.m;
-                                num_valid_neighbor += 1u;
-                            };
+                        auto neighbor_reservoir = _spatial_reservoir_buffer->read(neighbor_id);
+                        $if(dsl::isnan(neighbor_reservoir.weight.total_weight) | dsl::isnan(neighbor_reservoir.weight.target_pdf) | neighbor_reservoir.weight.m == 0.f) { $continue; };
+                        auto neighbor_target_pdf = def(0.f);
+                        $if(enable_visibility_reuse & unbiased) {
+                            auto [L, pdf] = _evaluate_with_occlusion(neighbor_reservoir.sample, *it, wo, swl, time);
+                            neighbor_target_pdf = pipeline().spectrum()->cie_y(swl, L);
+                        } $else {
+                            auto [L, pdf] = _evaluate_without_occlusion(neighbor_reservoir.sample, *it, wo, swl, time);
+                            neighbor_target_pdf = pipeline().spectrum()->cie_y(swl, L);
+                        };
+                        neighbor_reservoir.weight.total_weight *= ite(neighbor_reservoir.weight.target_pdf == 0.f, 0.f, neighbor_target_pdf / neighbor_reservoir.weight.target_pdf);
+                        neighbor_reservoir.weight.target_pdf = neighbor_target_pdf;
+                        reservoir.update(neighbor_reservoir, sampler()->generate_1d());
+                        $if(unbiased) {
+                            valid_neighbor_ray_array[num_valid_neighbor] = neighbor_ray;
+                            valid_neighbor_hit_array[num_valid_neighbor] = neighbor_hit;
+                            valid_neighbor_m_array[num_valid_neighbor] = neighbor_reservoir.weight.m;
+                            num_valid_neighbor += 1u;
                         };
                     };
                 };
@@ -389,8 +379,15 @@ private:
                     auto neighbor_ray = valid_neighbor_ray_array[neighbor_index];
                     auto neighbor_hit = valid_neighbor_hit_array[neighbor_index];
                     auto neighbor_it = pipeline().geometry()->interaction(neighbor_ray, neighbor_hit);
-                    auto [L, _] = _evaluate_with_occlusion(reservoir.sample, *neighbor_it, -neighbor_ray->direction(), swl, time);
-                    $if(any(L > 0.f)) {
+                    auto out_of_domain = def(true);
+                    $if(enable_visibility_reuse) {
+                        auto [_, pdf] = _evaluate_with_occlusion(reservoir.sample, *neighbor_it, -neighbor_ray->direction(), swl, time);
+                        out_of_domain = pdf == 0.f;
+                    } $else {
+                        auto [_, pdf] = _evaluate_without_occlusion(reservoir.sample, *neighbor_it, -neighbor_ray->direction(), swl, time);
+                        out_of_domain = pdf == 0.f;
+                    };
+                    $if(!out_of_domain) {
                         z += valid_neighbor_m_array[neighbor_index];
                     };
                 };
@@ -402,7 +399,7 @@ private:
         _temporal_reservoir_buffer->write(reservoir, pixel_id);
     }
     [[nodiscard]] Float3 Li(const Camera::Instance *camera, Expr<uint> frame_index, Expr<uint2> pixel_id, Expr<float> time,
-                            Expr<bool> enable_spatial_reuse, Expr<bool> unbiased) const noexcept {
+                            Expr<bool> enable_spatial_reuse, Expr<bool> unbiased, Expr<bool> enable_visibility_reuse) const noexcept {
         auto resolution = camera->film()->node()->resolution();
         sampler()->start(pixel_id, frame_index << 1u | 1u);
         auto spectrum = pipeline().spectrum();
@@ -450,6 +447,7 @@ private:
                         auto theta = 2.f * pi * u_theta;
                         auto offset = make_float2(radius * cos(theta), radius * sin(theta));
                         auto neighbor_id = make_uint2(clamp(make_float2(pixel_id) + offset, make_float2(0.f), make_float2(resolution) - 1.f));
+                        $if(all(neighbor_id == pixel_id)) { $continue; };
                         auto neighbor_ray = _visibility_buffer->ray(neighbor_id);
                         auto neighbor_hit = _visibility_buffer->hit(neighbor_id);
                         auto neighbor_it = pipeline().geometry()->interaction(neighbor_ray, neighbor_hit);
@@ -459,18 +457,22 @@ private:
                                 dot(it->ng(), neighbor_it->ng()) > 0.91f) {
                                 auto neighbor_reservoir = Reservoir::zero();
                                 neighbor_reservoir = _temporal_reservoir_buffer->read(neighbor_id);
-                                $if(dsl::isnan(neighbor_reservoir.weight.total_weight) | dsl::isnan(neighbor_reservoir.weight.target_pdf)) { $continue; };
-                                auto [L, pdf] = _evaluate_without_occlusion(neighbor_reservoir.sample, *it, wo, swl, time);
-                                $if(neighbor_reservoir.weight.target_pdf > 0.f) {
-                                    auto neighbor_target_pdf = pipeline().spectrum()->cie_y(swl, L);
-                                    neighbor_reservoir.weight.total_weight *= neighbor_target_pdf / neighbor_reservoir.weight.target_pdf;
-                                    neighbor_reservoir.weight.target_pdf = neighbor_target_pdf;
-                                    reservoir.update(neighbor_reservoir, sampler()->generate_1d());
-                                    $if(unbiased) {
-                                        valid_neighbor_array[num_valid_neighbor] = neighbor_id;
-                                        valid_neighbor_m_array[num_valid_neighbor] = neighbor_reservoir.weight.m;
-                                        num_valid_neighbor += 1u;
-                                    };
+                                $if(dsl::isnan(neighbor_reservoir.weight.total_weight) | dsl::isnan(neighbor_reservoir.weight.target_pdf) | neighbor_reservoir.weight.m == 0.f) { $continue; };
+                                auto neighbor_target_pdf = def(0.f);
+                                $if(enable_visibility_reuse & unbiased) {
+                                    auto [L, _] = _evaluate_with_occlusion(neighbor_reservoir.sample, *it, wo, swl, time);
+                                    neighbor_target_pdf = pipeline().spectrum()->cie_y(swl, L);
+                                } $else {
+                                    auto [L, _] = _evaluate_without_occlusion(neighbor_reservoir.sample, *it, wo, swl, time);
+                                    neighbor_target_pdf = pipeline().spectrum()->cie_y(swl, L);
+                                };
+                                neighbor_reservoir.weight.total_weight *= ite(neighbor_reservoir.weight.target_pdf == 0.f, 0.f, neighbor_target_pdf / neighbor_reservoir.weight.target_pdf);
+                                neighbor_reservoir.weight.target_pdf = neighbor_target_pdf;
+                                reservoir.update(neighbor_reservoir, sampler()->generate_1d());
+                                $if(unbiased) {
+                                    valid_neighbor_array[num_valid_neighbor] = neighbor_id;
+                                    valid_neighbor_m_array[num_valid_neighbor] = neighbor_reservoir.weight.m;
+                                    num_valid_neighbor += 1u;
                                 };
                             };
                         };
@@ -481,8 +483,15 @@ private:
                             auto neighbor_ray = _visibility_buffer->ray(neighbor_id);
                             auto neighbor_hit = _visibility_buffer->hit(neighbor_id);
                             auto neighbor_it = pipeline().geometry()->interaction(neighbor_ray, neighbor_hit);
-                            auto [L, _] = _evaluate_with_occlusion(reservoir.sample, *neighbor_it, -neighbor_ray->direction(), swl, time);
-                            $if(any(L > 0.f)) {
+                            auto out_of_domain = def(true);
+                            $if(enable_visibility_reuse) {
+                                auto [_, pdf] = _evaluate_with_occlusion(reservoir.sample, *neighbor_it, -neighbor_ray->direction(), swl, time);
+                                out_of_domain = pdf == 0.f;
+                            } $else {
+                                auto [_, pdf] = _evaluate_without_occlusion(reservoir.sample, *neighbor_it, -neighbor_ray->direction(), swl, time);
+                                out_of_domain = pdf == 0.f;
+                            };
+                            $if(!out_of_domain) {
                                 z += valid_neighbor_m_array[neighbor_index];
                             };
                         };
@@ -544,16 +553,16 @@ protected:
             _temporal_pass(camera, frame_index, pixel_id, time, num_initial_sample, enable_visibility_reuse,
                            enable_temporal_reuse, enable_decorrelation);
         };
-        Kernel2D spatial_pass_kernel = [&](UInt frame_index, Float time, Bool unbiased) noexcept {
+        Kernel2D spatial_pass_kernel = [&](UInt frame_index, Float time, Bool unbiased, Bool enable_visibility_reuse) noexcept {
             set_block_size(16u, 16u, 1u);
             auto pixel_id = dispatch_id().xy();
-            _spatial_pass(camera, frame_index, pixel_id, time, unbiased);
+            _spatial_pass(camera, frame_index, pixel_id, time, unbiased, enable_visibility_reuse);
         };
         Kernel2D render_kernel = [&](UInt frame_index, Float time, Float shutter_weight,
-                                     Bool enable_spatial_reuse, Bool unbiased) noexcept {
+                                     Bool enable_spatial_reuse, Bool unbiased, Bool enable_visibility_reuse) noexcept {
             set_block_size(16u, 16u, 1u);
             auto pixel_id = dispatch_id().xy();
-            auto L = Li(camera, frame_index, pixel_id, time, enable_spatial_reuse, unbiased);
+            auto L = Li(camera, frame_index, pixel_id, time, enable_spatial_reuse, unbiased, enable_visibility_reuse);
             camera->film()->accumulate(pixel_id, shutter_weight * L);
             $if(all(pixel_id == 0u)) {
                 auto view_matrix = inverse(camera->camera_to_world());
@@ -595,10 +604,11 @@ protected:
                                                 node<ReSTIRDirectLighting>()->enable_decorrelation())
                                       .dispatch(resolution);
                 if (node<ReSTIRDirectLighting>()->enable_spatial_reuse()) {
-                    command_buffer << spatial_pass(sample_id, s.point.time, node<ReSTIRDirectLighting>()->unbiased_spatial_reuse()).dispatch(resolution);
+                    command_buffer << spatial_pass(sample_id, s.point.time, node<ReSTIRDirectLighting>()->unbiased_spatial_reuse(),
+                                                   node<ReSTIRDirectLighting>()->enable_visibility_reuse()).dispatch(resolution);
                 }
                 command_buffer << render(sample_id++, s.point.time, s.point.weight, node<ReSTIRDirectLighting>()->enable_spatial_reuse(),
-                                         node<ReSTIRDirectLighting>()->unbiased_spatial_reuse())
+                                         node<ReSTIRDirectLighting>()->unbiased_spatial_reuse(), node<ReSTIRDirectLighting>()->enable_visibility_reuse())
                                       .dispatch(resolution);
                 _temporal_reservoir_buffer->copy_from(command_buffer, *_spatial_reservoir_buffer);
                 if (auto &&p = pipeline().printer(); !p.empty()) {
