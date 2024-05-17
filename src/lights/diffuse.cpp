@@ -117,9 +117,6 @@ public:
         auto L = light->texture()->evaluate_illuminant_spectrum(it_light, swl(), time()).value *
                  light->node<DiffuseLight>()->scale();
         auto luminance = pipeline.spectrum()->cie_y(swl(), L);
-        $if(light->node<DiffuseLight>()->two_sided()) {
-            luminance *= 2.f;
-        };
         return luminance;
     }
 
