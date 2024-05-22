@@ -248,6 +248,17 @@ private:
                 candidate.weight.total_weight = ite(pdf == 0.f, 0.f, candidate.weight.target_pdf / pdf);
                 reservoir.update(candidate, sampler()->generate_1d());
             };
+            // visibility reuse
+            $if(enable_visibility_reuse) {
+                auto light_sample = LightSampler::Sample::zero(swl.dimension());
+                $outline {
+                    light_sample = light_sampler()->sample_light(*it, {reservoir.sample.tag, 1.f}, reservoir.sample.u_light_surface, swl, time);
+                };
+                auto occluded = pipeline().geometry()->intersect_any(light_sample.shadow_ray);
+                $if(light_sample.eval.pdf == 0.f | occluded) {
+                    reservoir.weight.total_weight = 0.f;
+                };
+            };
             // temporal reuse
             $if(enable_temporal_reuse & frame_index != 0u) {
                 auto prev_frame_view_matrix = _prev_frame_view_matrix->read(0u);
@@ -268,7 +279,7 @@ private:
             };
             // perturb the light samples to reduce correlation, use Metropolis to determine whether to accept the perturbation
             $if(enable_decorrelation) {
-                auto constexpr MARKOV_CHAIN_LENGTH = 8u;
+                auto MARKOV_CHAIN_LENGTH = ite(enable_visibility_reuse, 4u, 8u);
                 auto sample_box_muller = [](Expr<float2> u) noexcept {
                     auto r = sqrt(clamp(-2.f * log(u.x), 0.f, 1.f));
                     auto theta = 2.f * pi * u.y;
@@ -284,7 +295,17 @@ private:
                     auto perturbation = 0.01f * sample_box_muller(sampler()->generate_2d());
                     candidate.sample.u_light_surface = reservoir.sample.u_light_surface + perturbation;
                     $if(any(candidate.sample.u_light_surface < 0.f) | any(candidate.sample.u_light_surface > 1.f)) { $continue; };
-                    auto [L, pdf] = _evaluate_without_occlusion(candidate.sample, *it, wo, swl, time);
+                    auto L = SampledSpectrum{swl.dimension(), 0.f};
+                    auto pdf = def(0.f);
+                    $if(enable_visibility_reuse) {
+                        auto eval = _evaluate_with_occlusion(candidate.sample, *it, wo, swl, time);
+                        L = eval.first;
+                        pdf = eval.second;
+                    } $else {
+                        auto eval = _evaluate_without_occlusion(candidate.sample, *it, wo, swl, time);
+                        L = eval.first;
+                        pdf = eval.second;
+                    };
                     $if(pdf == 0.f) { $continue; };
                     candidate.weight.target_pdf = pipeline().spectrum()->cie_y(swl, L);
                     auto candidate_markov_weight = candidate.weight.target_pdf / pdf;
@@ -294,17 +315,6 @@ private:
                         markov_weight = candidate_markov_weight;
                         reservoir = candidate;
                     };
-                };
-            };
-            // visibility reuse
-            $if(enable_visibility_reuse) {
-                auto light_sample = LightSampler::Sample::zero(swl.dimension());
-                $outline {
-                    light_sample = light_sampler()->sample_light(*it, {reservoir.sample.tag, 1.f}, reservoir.sample.u_light_surface, swl, time);
-                };
-                auto occluded = pipeline().geometry()->intersect_any(light_sample.shadow_ray);
-                $if(light_sample.eval.pdf == 0.f | occluded) {
-                    reservoir.weight.total_weight = 0.f;
                 };
             };
             $break;
@@ -596,6 +606,7 @@ protected:
         for (auto s : shutter_samples) {
             pipeline().update(command_buffer, s.point.time);
             for (auto i = 0u; i < s.spp; i++) {
+                camera->film()->clear(command_buffer);
                 auto constexpr num_spatial_reuse_pass = 2u;
                 command_buffer << temporal_pass(sample_id, s.point.time,
                                                 node<ReSTIRDirectLighting>()->num_initial_sample(),
