@@ -279,7 +279,7 @@ private:
             };
             // perturb the light samples to reduce correlation, use Metropolis to determine whether to accept the perturbation
             $if(enable_decorrelation) {
-                auto MARKOV_CHAIN_LENGTH = ite(enable_visibility_reuse, 4u, 8u);
+                auto MARKOV_CHAIN_LENGTH = ite(enable_visibility_reuse, 1u, 8u);
                 auto sample_box_muller = [](Expr<float2> u) noexcept {
                     auto r = sqrt(clamp(-2.f * log(u.x), 0.f, 1.f));
                     auto theta = 2.f * pi * u.y;
@@ -327,7 +327,7 @@ private:
     void _spatial_pass(const Camera::Instance *camera, Expr<uint> frame_index, Expr<uint2> pixel_id, Expr<float> time,
                        Expr<bool> unbiased, Expr<bool> enable_visibility_reuse) const noexcept {
         auto resolution = camera->film()->node()->resolution();
-        sampler()->start(pixel_id << 1u, frame_index);
+        sampler()->start(pixel_id, frame_index << 1u);
         auto spectrum = pipeline().spectrum();
         auto swl = spectrum->sample(spectrum->node()->is_fixed() ? 0.f : sampler()->generate_1d());
         auto ray = _visibility_buffer->ray(pixel_id);
@@ -360,7 +360,7 @@ private:
                 auto neighbor_it = pipeline().geometry()->interaction(neighbor_ray, neighbor_hit);
                 $if(neighbor_it->valid() & neighbor_it->shape().has_surface()) {
                     auto neighbor_pixel_depth = dot(depth_projector.xyz(), neighbor_it->p()) + depth_projector.w;
-                    $if(abs(neighbor_pixel_depth - current_pixel_depth) < 0.05f * abs(current_pixel_depth) &
+                    $if(abs(neighbor_pixel_depth - current_pixel_depth) < 0.1f * abs(current_pixel_depth) &
                         dot(it->ng(), neighbor_it->ng()) > 0.91f) {
                         auto neighbor_reservoir = _spatial_reservoir_buffer->read(neighbor_id);
                         $if(dsl::isnan(neighbor_reservoir.weight.total_weight) | dsl::isnan(neighbor_reservoir.weight.target_pdf) | neighbor_reservoir.weight.m == 0.f) { $continue; };
