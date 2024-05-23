@@ -391,11 +391,11 @@ private:
                     auto neighbor_it = pipeline().geometry()->interaction(neighbor_ray, neighbor_hit);
                     auto out_of_domain = def(true);
                     $if(enable_visibility_reuse) {
-                        auto [_, pdf] = _evaluate_with_occlusion(reservoir.sample, *neighbor_it, -neighbor_ray->direction(), swl, time);
-                        out_of_domain = pdf == 0.f;
+                        auto [L, _] = _evaluate_with_occlusion(reservoir.sample, *neighbor_it, -neighbor_ray->direction(), swl, time);
+                        out_of_domain = L.is_zero();
                     } $else {
-                        auto [_, pdf] = _evaluate_without_occlusion(reservoir.sample, *neighbor_it, -neighbor_ray->direction(), swl, time);
-                        out_of_domain = pdf == 0.f;
+                        auto [L, _] = _evaluate_without_occlusion(reservoir.sample, *neighbor_it, -neighbor_ray->direction(), swl, time);
+                        out_of_domain = L.is_zero();
                     };
                     $if(!out_of_domain) {
                         z += valid_neighbor_m_array[neighbor_index];
@@ -444,8 +444,9 @@ private:
                     reservoir = _temporal_reservoir_buffer->read(pixel_id);
                     auto num_neighbor_sample = ite(unbiased, 3u, 5u);
                     auto constexpr neighbor_radius = 30.f;
-                    auto valid_neighbor_array = ArrayUInt2<3u>();
-                    auto valid_neighbor_m_array = ArrayFloat<3u>();
+                    ArrayVar<Ray, 3u> valid_neighbor_ray_array;
+                    ArrayVar<Hit, 3u> valid_neighbor_hit_array;
+                    ArrayFloat<3u> valid_neighbor_m_array;
                     auto num_valid_neighbor = def(0u);
                     auto z = reservoir.weight.m;
                     auto camera_to_world = camera->camera_to_world();
@@ -480,7 +481,8 @@ private:
                                 neighbor_reservoir.weight.target_pdf = neighbor_target_pdf;
                                 reservoir.update(neighbor_reservoir, sampler()->generate_1d());
                                 $if(unbiased) {
-                                    valid_neighbor_array[num_valid_neighbor] = neighbor_id;
+                                    valid_neighbor_ray_array[num_valid_neighbor] = neighbor_ray;
+                                    valid_neighbor_hit_array[num_valid_neighbor] = neighbor_hit;
                                     valid_neighbor_m_array[num_valid_neighbor] = neighbor_reservoir.weight.m;
                                     num_valid_neighbor += 1u;
                                 };
@@ -489,17 +491,16 @@ private:
                     };
                     $if(unbiased) {
                         $for(neighbor_index, num_valid_neighbor) {
-                            auto neighbor_id = valid_neighbor_array[neighbor_index];
-                            auto neighbor_ray = _visibility_buffer->ray(neighbor_id);
-                            auto neighbor_hit = _visibility_buffer->hit(neighbor_id);
+                            auto neighbor_ray = valid_neighbor_ray_array[neighbor_index];
+                            auto neighbor_hit = valid_neighbor_hit_array[neighbor_index];
                             auto neighbor_it = pipeline().geometry()->interaction(neighbor_ray, neighbor_hit);
                             auto out_of_domain = def(true);
                             $if(enable_visibility_reuse) {
-                                auto [_, pdf] = _evaluate_with_occlusion(reservoir.sample, *neighbor_it, -neighbor_ray->direction(), swl, time);
-                                out_of_domain = pdf == 0.f;
+                                auto [L, _] = _evaluate_with_occlusion(reservoir.sample, *neighbor_it, -neighbor_ray->direction(), swl, time);
+                                out_of_domain = L.is_zero();
                             } $else {
-                                auto [_, pdf] = _evaluate_without_occlusion(reservoir.sample, *neighbor_it, -neighbor_ray->direction(), swl, time);
-                                out_of_domain = pdf == 0.f;
+                                auto [L, _] = _evaluate_without_occlusion(reservoir.sample, *neighbor_it, -neighbor_ray->direction(), swl, time);
+                                out_of_domain = L.is_zero();
                             };
                             $if(!out_of_domain) {
                                 z += valid_neighbor_m_array[neighbor_index];
@@ -606,7 +607,7 @@ protected:
         for (auto s : shutter_samples) {
             pipeline().update(command_buffer, s.point.time);
             for (auto i = 0u; i < s.spp; i++) {
-                camera->film()->clear(command_buffer);
+                // camera->film()->clear(command_buffer);
                 auto constexpr num_spatial_reuse_pass = 2u;
                 command_buffer << temporal_pass(sample_id, s.point.time,
                                                 node<ReSTIRDirectLighting>()->num_initial_sample(),
