@@ -278,41 +278,29 @@ private:
                 };
             };
             // perturb the light samples to reduce correlation, use Metropolis to determine whether to accept the perturbation
-            $if(enable_decorrelation) {
-                auto MARKOV_CHAIN_LENGTH = ite(enable_visibility_reuse, 1u, 8u);
+            $if(enable_decorrelation & reservoir.weight.total_weight > 0.f) {
+                auto MARKOV_CHAIN_LENGTH = 4u;
                 auto sample_box_muller = [](Expr<float2> u) noexcept {
                     auto r = sqrt(clamp(-2.f * log(u.x), 0.f, 1.f));
                     auto theta = 2.f * pi * u.y;
                     return make_float2(r * cos(theta), r * sin(theta));
                 };
-                auto markov_weight = def(0.f);
-                $if(reservoir.weight.total_weight > 0.f) {
-                    auto [_, pdf] = _evaluate_without_occlusion(reservoir.sample, *it, wo, swl, time);
-                    markov_weight = reservoir.weight.target_pdf / pdf;
-                };
                 $for(markov_iter, MARKOV_CHAIN_LENGTH) {
                     auto candidate = reservoir;
-                    auto perturbation = 0.01f * sample_box_muller(sampler()->generate_2d());
+                    auto perturbation = 0.025f * sample_box_muller(sampler()->generate_2d());
                     candidate.sample.u_light_surface = reservoir.sample.u_light_surface + perturbation;
                     $if(any(candidate.sample.u_light_surface < 0.f) | any(candidate.sample.u_light_surface > 1.f)) { $continue; };
-                    auto L = SampledSpectrum{swl.dimension(), 0.f};
-                    auto pdf = def(0.f);
+                    auto sample_target_pdf = def(0.f);
                     $if(enable_visibility_reuse) {
-                        auto eval = _evaluate_with_occlusion(candidate.sample, *it, wo, swl, time);
-                        L = eval.first;
-                        pdf = eval.second;
+                        auto [L, _] = _evaluate_with_occlusion(candidate.sample, *it, wo, swl, time);
+                        sample_target_pdf = pipeline().spectrum()->cie_y(swl, L);
                     } $else {
-                        auto eval = _evaluate_without_occlusion(candidate.sample, *it, wo, swl, time);
-                        L = eval.first;
-                        pdf = eval.second;
+                        auto [L, _] = _evaluate_without_occlusion(candidate.sample, *it, wo, swl, time);
+                        sample_target_pdf = pipeline().spectrum()->cie_y(swl, L);
                     };
-                    $if(pdf == 0.f) { $continue; };
-                    candidate.weight.target_pdf = pipeline().spectrum()->cie_y(swl, L);
-                    auto candidate_markov_weight = candidate.weight.target_pdf / pdf;
-                    auto accepting_prob = min(1.f, ite(markov_weight == 0.f, 1.f, candidate_markov_weight / markov_weight));
-                    candidate.weight.total_weight *= candidate.weight.target_pdf / reservoir.weight.target_pdf;
+                    auto accepting_prob = min(1.f, sample_target_pdf / candidate.weight.target_pdf);
+                    candidate.weight.target_pdf = sample_target_pdf;
                     $if(sampler()->generate_1d() < accepting_prob) {
-                        markov_weight = candidate_markov_weight;
                         reservoir = candidate;
                     };
                 };
