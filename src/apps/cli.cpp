@@ -83,6 +83,11 @@
         std::cout << cli.help() << std::endl;
         exit(0);
     }
+    if (options["backend"].count() == 0) [[unlikely]] {
+        LUISA_WARNING_WITH_LOCATION("Backend not specified.");
+        std::cout << cli.help() << std::endl;
+        exit(-1);
+    }
     if (options["scene"].count() == 0u) [[unlikely]] {
         LUISA_WARNING_WITH_LOCATION("Scene file not specified.");
         std::cout << cli.help() << std::endl;
