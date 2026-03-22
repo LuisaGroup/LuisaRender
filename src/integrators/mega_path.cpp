@@ -57,6 +57,7 @@ protected:
         auto swl = spectrum->sample(spectrum->node()->is_fixed() ? 0.f : sampler()->generate_1d());
         SampledSpectrum beta{swl.dimension(), camera_weight};
         SampledSpectrum Li{swl.dimension()};
+        Float eta_scale = def(1.f);
 
         auto ray = camera_ray;
         auto pdf_bsdf = def(1e16f);
@@ -109,7 +110,6 @@ protected:
 
             // evaluate material
             auto surface_tag = it->shape().surface_tag();
-            auto eta_scale = def(1.f);
 
             $outline {
                 PolymorphicCall<Surface::Closure> call;
@@ -137,8 +137,8 @@ protected:
                     // apply eta scale
                     auto eta = closure->eta().value_or(1.f);
                     $switch(surface_sample.event) {
-                        $case(Surface::event_enter) { eta_scale = sqr(eta); };
-                        $case(Surface::event_exit) { eta_scale = sqr(1.f / eta); };
+                        $case(Surface::event_enter) { eta_scale *= sqr(eta); };
+                        $case(Surface::event_exit) { eta_scale *= sqr(1.f / eta); };
                     };
                 });
             };
