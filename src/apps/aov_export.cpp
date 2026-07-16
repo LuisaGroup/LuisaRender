@@ -152,6 +152,7 @@
     // remove all nullptrs
     auto new_end = std::remove(argv, argv + argc, nullptr);
     argc = static_cast<int>(new_end - argv);
+    argv[argc] = nullptr;
     return macros;
 }
 
