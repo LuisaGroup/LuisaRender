@@ -6,6 +6,7 @@
 
 #include <span>
 #include <iostream>
+#include <algorithm>
 
 #include <cxxopts.hpp>
 
